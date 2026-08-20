@@ -8,10 +8,53 @@
 #include "ota_task.h"
 
 #include "esp_http_server.h"
+#include "esp_log.h"
 #include "cJSON.h"
 #include <string.h>
+#include <stdbool.h>
 
+static const char *TAG = "web_server";
 static httpd_handle_t s_server = NULL;
+
+/* ADC1 attenuated full-scale range (ADC_ATTEN_DB_12, see adc_task.c). */
+#define ADC_MV_MIN 0
+#define ADC_MV_MAX 3300
+
+static bool calibration_is_valid(const si_calibration_t *cal)
+{
+    if (cal->u_min_mv < ADC_MV_MIN || cal->u_min_mv > ADC_MV_MAX) return false;
+    if (cal->u_max_mv < ADC_MV_MIN || cal->u_max_mv > ADC_MV_MAX) return false;
+    if (cal->u_lambda1_mv < ADC_MV_MIN || cal->u_lambda1_mv > ADC_MV_MAX) return false;
+    if (cal->deadband_mv < 0 || cal->deadband_mv > ADC_MV_MAX) return false;
+    if (cal->u_min_mv >= cal->u_max_mv) return false;
+    if (cal->u_lambda1_mv <= cal->u_min_mv || cal->u_lambda1_mv >= cal->u_max_mv) return false;
+    return true;
+}
+
+/* Reads req->content_len bytes into buf (size buf_size, leaving room for a
+ * NUL terminator), looping over httpd_req_recv() since a body can arrive
+ * across multiple TCP segments. Returns the byte count on success, or -1
+ * on error/oversized body (caller should send its own error response). */
+static int recv_body(httpd_req_t *req, char *buf, size_t buf_size)
+{
+    if (req->content_len <= 0 || (size_t)req->content_len >= buf_size) {
+        return -1;
+    }
+
+    size_t total = 0;
+    while (total < (size_t)req->content_len) {
+        int received = httpd_req_recv(req, buf + total, req->content_len - total);
+        if (received == HTTPD_SOCK_ERR_TIMEOUT) {
+            continue;
+        }
+        if (received <= 0) {
+            return -1;
+        }
+        total += received;
+    }
+    buf[total] = '\0';
+    return (int)total;
+}
 
 static esp_err_t index_get_handler(httpd_req_t *req)
 {
@@ -93,12 +136,10 @@ static esp_err_t config_get_handler(httpd_req_t *req)
 static esp_err_t config_post_handler(httpd_req_t *req)
 {
     char buf[256];
-    int len = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (len <= 0) {
+    if (recv_body(req, buf, sizeof(buf)) < 0) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
         return ESP_FAIL;
     }
-    buf[len] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
     if (!root) {
@@ -116,6 +157,12 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     if ((item = cJSON_GetObjectItem(root, "deadband_mv"))) cal.deadband_mv = item->valueint;
 
     cJSON_Delete(root);
+
+    if (!calibration_is_valid(&cal)) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Calibration values out of range");
+        return ESP_FAIL;
+    }
+
     nvs_store_save_config(&cal);
     adc_task_set_calibration(&cal);
 
@@ -191,12 +238,10 @@ static esp_err_t snapshot_get_handler(httpd_req_t *req)
 static esp_err_t autocal_post_handler(httpd_req_t *req)
 {
     char buf[128];
-    int len = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (len <= 0) {
+    if (recv_body(req, buf, sizeof(buf)) < 0) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
         return ESP_FAIL;
     }
-    buf[len] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
     if (!root) {
@@ -247,7 +292,7 @@ static esp_err_t autocal_get_handler(httpd_req_t *req)
     uint32_t count = adc_task_autocal_count();
     cJSON *root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "count", count);
-    cJSON_AddNumberToObject(root, "max", 100);
+    cJSON_AddNumberToObject(root, "max", adc_task_autocal_max());
 
     char *json = cJSON_PrintUnformatted(root);
     httpd_resp_set_type(req, "application/json");
@@ -257,40 +302,15 @@ static esp_err_t autocal_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static esp_err_t ws_handler(httpd_req_t *req)
-{
-    if (req->method == HTTP_GET) {
-        return ESP_OK;
-    }
-
-    adc_snapshot_t snap;
-    adc_task_get_snapshot(&snap);
-
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "index_fast", snap.index_fast);
-    cJSON_AddNumberToObject(root, "index_slow_avg", snap.index_slow_avg);
-    cJSON_AddNumberToObject(root, "category", snap.category);
-    cJSON_AddNumberToObject(root, "warmup_state", snap.warmup_state);
-    cJSON_AddNumberToObject(root, "switches_per_min", snap.switches_per_min);
-    cJSON_AddNumberToObject(root, "seconds_since_last_edge", snap.seconds_since_last_edge);
-
-    char *json = cJSON_PrintUnformatted(root);
-    httpd_ws_frame_t ws_pkt = { 0 };
-    ws_pkt.payload = (uint8_t *)json;
-    ws_pkt.len = strlen(json);
-    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-    httpd_ws_send_frame(req, &ws_pkt);
-
-    cJSON_free(json);
-    cJSON_Delete(root);
-    return ESP_OK;
-}
-
 void web_server_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 15;
-    httpd_start(&s_server, &config);
+    config.max_uri_handlers = 14;
+    esp_err_t err = httpd_start(&s_server, &config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "httpd_start failed: %s", esp_err_to_name(err));
+        return;
+    }
 
     httpd_uri_t uris[] = {
         { .uri = "/", .method = HTTP_GET, .handler = index_get_handler },
@@ -307,7 +327,6 @@ void web_server_start(void)
         { .uri = "/uplot.min.css", .method = HTTP_GET, .handler = uplot_css_get_handler },
         { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },
         { .uri = "/api/ota", .method = HTTP_POST, .handler = ota_post_handler },
-        { .uri = "/ws", .method = HTTP_GET, .handler = ws_handler, .is_websocket = true },
     };
 
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {

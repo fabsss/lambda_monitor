@@ -2,17 +2,23 @@
 #include "nvs_store.h"
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "esp_log.h"
 
 #define NVS_NAMESPACE "lambda_mon"
 #define KEY_STATS "lt_stats"
 #define KEY_CONFIG "config"
+
+static const char *TAG = "nvs_store";
 
 void nvs_store_init(void)
 {
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         nvs_flash_erase();
-        nvs_flash_init();
+        err = nvs_flash_init();
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs_flash_init failed: %s", esp_err_to_name(err));
     }
 }
 
@@ -33,11 +39,21 @@ static bool load_blob(const char *key, void *out, size_t expected_size)
 static void save_blob(const char *key, const void *data, size_t size)
 {
     nvs_handle_t handle;
-    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) {
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs_open(%s) failed: %s", key, esp_err_to_name(err));
         return;
     }
-    nvs_set_blob(handle, key, data, size);
-    nvs_commit(handle);
+
+    err = nvs_set_blob(handle, key, data, size);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "nvs_set_blob(%s) failed: %s", key, esp_err_to_name(err));
+    } else {
+        err = nvs_commit(handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "nvs_commit(%s) failed: %s", key, esp_err_to_name(err));
+        }
+    }
     nvs_close(handle);
 }
 

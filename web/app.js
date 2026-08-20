@@ -1,9 +1,14 @@
+'use strict';
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'chart' && window.resizeChartToContainer) {
+      window.resizeChartToContainer();
+    }
   });
 });
 
@@ -79,7 +84,14 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
   for (const [key, value] of form.entries()) {
     body[key] = parseInt(value, 10);
   }
-  await fetch('/api/config', { method: 'POST', body: JSON.stringify(body) });
+  const res = await fetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    alert('Failed to save calibration: ' + (await res.text()));
+  }
 });
 
 document.getElementById('wizard-set-lambda1').addEventListener('click', () => {
@@ -98,6 +110,7 @@ document.getElementById('wizard-autocal-start').addEventListener('click', async 
   document.getElementById('wizard-autocal-status').textContent = 'Collecting samples...';
   await fetch('/api/calibrate/auto', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'start' })
   });
 });
@@ -107,6 +120,7 @@ document.getElementById('wizard-autocal-derive').addEventListener('click', async
   document.getElementById('wizard-autocal-status').textContent = 'Deriving calibration...';
   const res = await fetch('/api/calibrate/auto', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'derive' })
   });
   const cal = await res.json();
@@ -128,16 +142,22 @@ setInterval(updateAutocalStatus, 200);
 let chartWindowS = 60;
 let frozen = false;
 
+const chartContainer = document.getElementById('chart');
 const chartData = [[], []];
 const uplotInstance = new uPlot({
-  width: 600,
+  width: chartContainer.clientWidth,
   height: 300,
   series: [
     {},
     { label: 'Mixture Index', stroke: 'green', width: 2 },
   ],
   scales: { y: { range: [-100, 100] } },
-}, chartData, document.getElementById('chart'));
+}, chartData, chartContainer);
+
+window.resizeChartToContainer = () => {
+  uplotInstance.setSize({ width: chartContainer.clientWidth, height: 300 });
+};
+window.addEventListener('resize', window.resizeChartToContainer);
 
 async function refreshChart() {
   if (frozen) return;

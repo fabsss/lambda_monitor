@@ -48,7 +48,11 @@ static void adc_task_fn(void *arg)
     while (1) {
         int raw = 0;
         int raw_mv = 0;
-        adc_oneshot_read(s_adc_handle, ADC_CHANNEL_0, &raw);
+        esp_err_t read_err = adc_oneshot_read(s_adc_handle, ADC_CHANNEL_0, &raw);
+        if (read_err != ESP_OK) {
+            vTaskDelay(pdMS_TO_TICKS(SAMPLE_PERIOD_MS));
+            continue;
+        }
         adc_cali_raw_to_voltage(s_cali_handle, raw, &raw_mv);
 
         int32_t fast_mv = fast_filter_push(&s_fast, raw_mv);
@@ -106,13 +110,13 @@ void adc_task_start(int adc1_channel)
     nvs_store_load_config(&s_cal);
 
     adc_oneshot_unit_init_cfg_t init_cfg = { .unit_id = ADC_UNIT_1 };
-    adc_oneshot_new_unit(&init_cfg, &s_adc_handle);
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_cfg, &s_adc_handle));
 
     adc_oneshot_chan_cfg_t chan_cfg = {
         .bitwidth = ADC_BITWIDTH_DEFAULT,
         .atten = ADC_ATTEN_DB_12,
     };
-    adc_oneshot_config_channel(s_adc_handle, (adc_channel_t)adc1_channel, &chan_cfg);
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc_handle, (adc_channel_t)adc1_channel, &chan_cfg));
 
     adc_cali_curve_fitting_config_t cali_cfg = {
         .unit_id = ADC_UNIT_1,
@@ -120,7 +124,7 @@ void adc_task_start(int adc1_channel)
         .atten = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
-    adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_cali_handle);
+    ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&cali_cfg, &s_cali_handle));
 
     xTaskCreate(adc_task_fn, "adc_task", 4096, NULL, 5, NULL);
 }
@@ -191,4 +195,9 @@ uint32_t adc_task_autocal_count(void)
     uint32_t count = s_autocal_count;
     xSemaphoreGive(s_mutex);
     return count;
+}
+
+uint32_t adc_task_autocal_max(void)
+{
+    return AUTOCAL_BUFFER_SIZE;
 }

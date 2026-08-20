@@ -1,5 +1,6 @@
-body { font-family: sans-serif; margin: 0; padding: 1rem; }
-nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+* { box-sizing: border-box; }
+body { font-family: sans-serif; margin: 0; padding: 1rem; max-width: 100%; overflow-x: hidden; }
+nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
 .tab-btn.active { font-weight: bold; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
@@ -8,3 +9,13 @@ nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 .bar-lean { background: red; }
 .bar-lambda1 { background: green; }
 .bar-rich { background: blue; }
+
+#gauge { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto; }
+
+#chart { width: 100%; max-width: 100%; overflow-x: auto; }
+#chart canvas, #chart .u-wrap { max-width: 100%; }
+
+button, input, .tab-btn { min-height: 44px; }
+input[type="number"] { width: 100%; max-width: 200px; }
+
+form label { display: block; margin-bottom: 0.5rem; }

@@ -24,5 +24,6 @@ void adc_task_get_session_stats(lambda_longterm_stats_t *out);
 void adc_task_autocal_start(void);
 void adc_task_autocal_stop_and_derive(si_calibration_t *out_cal);
 uint32_t adc_task_autocal_count(void);
+uint32_t adc_task_autocal_max(void);
 
 #endif
