@@ -69,7 +69,10 @@ document.getElementById('reset-btn').addEventListener('click', async () => {
 document.getElementById('config-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
-  const body = Object.fromEntries(form.entries());
+  const body = {};
+  for (const [key, value] of form.entries()) {
+    body[key] = parseInt(value, 10);
+  }
   await fetch('/api/config', { method: 'POST', body: JSON.stringify(body) });
 });
 

@@ -84,13 +84,13 @@ void adc_task_start(int adc1_channel)
 {
     s_mutex = xSemaphoreCreateMutex();
 
-    si_default_calibration(&s_cal);
     fast_filter_init(&s_fast);
     slow_filter_init(&s_slow, 5);
     warmup_fsm_init(&s_warmup, WARMUP_TIMEOUT_S);
     switch_detector_init(&s_switch);
     ring_buffer_init(&s_ring);
     nvs_store_load_stats(&s_longterm);
+    nvs_store_load_config(&s_cal);
 
     adc_oneshot_unit_init_cfg_t init_cfg = { .unit_id = ADC_UNIT_1 };
     adc_oneshot_new_unit(&init_cfg, &s_adc_handle);
@@ -133,5 +133,12 @@ void adc_task_get_curve(int32_t *out_values, uint32_t *out_timestamps, uint16_t 
         out_timestamps[i] = ts;
     }
     *out_count = count;
+    xSemaphoreGive(s_mutex);
+}
+
+void adc_task_set_calibration(const si_calibration_t *cal)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    s_cal = *cal;
     xSemaphoreGive(s_mutex);
 }

@@ -50,7 +50,9 @@ void nvs_store_load_stats(lambda_longterm_stats_t *out)
 
 void nvs_store_save_stats(const lambda_longterm_stats_t *stats)
 {
-    save_blob(KEY_STATS, stats, sizeof(*stats));
+    lambda_longterm_stats_t to_save = *stats;
+    lambda_stats_finalize_crc(&to_save);
+    save_blob(KEY_STATS, &to_save, sizeof(to_save));
 }
 
 void nvs_store_load_config(si_calibration_t *out)
@@ -69,5 +71,6 @@ void nvs_store_reset_longterm(void)
 {
     lambda_longterm_stats_t fresh;
     lambda_stats_reset(&fresh);
-    nvs_store_save_stats(&fresh);
+    lambda_stats_finalize_crc(&fresh);
+    save_blob(KEY_STATS, &fresh, sizeof(fresh));
 }

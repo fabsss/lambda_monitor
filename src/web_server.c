@@ -84,11 +84,17 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     char buf[256];
     int len = httpd_req_recv(req, buf, sizeof(buf) - 1);
     if (len <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
         return ESP_FAIL;
     }
     buf[len] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "JSON parse error");
+        return ESP_FAIL;
+    }
+
     si_calibration_t cal;
     si_default_calibration(&cal);
 
@@ -100,7 +106,9 @@ static esp_err_t config_post_handler(httpd_req_t *req)
 
     cJSON_Delete(root);
     nvs_store_save_config(&cal);
+    adc_task_set_calibration(&cal);
 
+    httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, "{\"ok\":true}", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
