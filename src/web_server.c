@@ -17,6 +17,18 @@ static esp_err_t index_get_handler(httpd_req_t *req)
     return httpd_resp_send(req, INDEX_HTML, HTTPD_RESP_USE_STRLEN);
 }
 
+static esp_err_t style_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/css");
+    return httpd_resp_send(req, STYLE_CSS, HTTPD_RESP_USE_STRLEN);
+}
+
+static esp_err_t app_js_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/javascript");
+    return httpd_resp_send(req, APP_JS, HTTPD_RESP_USE_STRLEN);
+}
+
 static esp_err_t stats_get_handler(httpd_req_t *req)
 {
     lambda_longterm_stats_t stats;
@@ -127,6 +139,8 @@ void web_server_start(void)
 
     httpd_uri_t uris[] = {
         { .uri = "/", .method = HTTP_GET, .handler = index_get_handler },
+        { .uri = "/style.css", .method = HTTP_GET, .handler = style_get_handler },
+        { .uri = "/app.js", .method = HTTP_GET, .handler = app_js_get_handler },
         { .uri = "/api/stats", .method = HTTP_GET, .handler = stats_get_handler },
         { .uri = "/api/reset", .method = HTTP_POST, .handler = reset_post_handler },
         { .uri = "/api/config", .method = HTTP_GET, .handler = config_get_handler },

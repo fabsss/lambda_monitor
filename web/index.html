@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lambda Monitor</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav>
+    <button data-tab="live" class="tab-btn active">Live</button>
+    <button data-tab="chart" class="tab-btn">Chart</button>
+    <button data-tab="settings" class="tab-btn">Settings</button>
+  </nav>
+
+  <section id="tab-live" class="tab-panel active">
+    <svg id="gauge" viewBox="0 0 200 120" width="300">
+      <path d="M20,110 A80,80 0 0,1 76,35" stroke="red" stroke-width="12" fill="none"/>
+      <path d="M76,35 A80,80 0 0,1 124,35" stroke="green" stroke-width="12" fill="none"/>
+      <path d="M124,35 A80,80 0 0,1 180,110" stroke="blue" stroke-width="12" fill="none"/>
+      <line id="needle-fast" x1="100" y1="110" x2="100" y2="30" stroke="black" stroke-width="3"/>
+      <line id="needle-slow" x1="100" y1="110" x2="100" y2="40" stroke="gray" stroke-width="2"/>
+    </svg>
+    <p id="status-text">Sensor warming up…</p>
+    <p>Switching frequency: <span id="switch-freq">0</span> /min</p>
+    <div id="session-bar" class="stacked-bar"></div>
+    <div id="longterm-bar" class="stacked-bar"></div>
+    <button id="reset-btn">Reset long-term statistics</button>
+  </section>
+
+  <section id="tab-chart" class="tab-panel">
+    <div id="chart"></div>
+    <button id="freeze-btn">Freeze</button>
+  </section>
+
+  <section id="tab-settings" class="tab-panel">
+    <form id="config-form">
+      <label>u_min (mV) <input name="u_min_mv" type="number"></label>
+      <label>u_max (mV) <input name="u_max_mv" type="number"></label>
+      <label>u_lambda1 (mV) <input name="u_lambda1_mv" type="number"></label>
+      <label>deadband (mV) <input name="deadband_mv" type="number"></label>
+      <button type="submit">Save</button>
+    </form>
+    <div id="wizard">
+      <p>Live voltage: <span id="wizard-live-mv">-</span> mV</p>
+      <button id="wizard-set-lambda1">Take as λ=1</button>
+      <button id="wizard-set-min">Take as u_min (lean)</button>
+      <button id="wizard-set-max">Take as u_max (rich)</button>
+    </div>
+  </section>
+
+  <script src="/app.js"></script>
+</body>
+</html>
