@@ -61,6 +61,20 @@ async function updateLiveData() {
 setInterval(updateLiveData, 500);
 updateLiveData();
 
+async function refreshConfig() {
+  try {
+    const res = await fetch('/api/config');
+    const data = await res.json();
+    document.querySelector('[name=u_min_mv]').value = data.u_min_mv;
+    document.querySelector('[name=u_max_mv]').value = data.u_max_mv;
+    document.querySelector('[name=u_lambda1_mv]').value = data.u_lambda1_mv;
+    document.querySelector('[name=deadband_mv]').value = data.deadband_mv;
+  } catch (e) {
+    console.error('config fetch failed:', e);
+  }
+}
+refreshConfig();
+
 async function refreshStats() {
   const res = await fetch('/api/stats');
   const data = await res.json();
@@ -91,6 +105,9 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
   });
   if (!res.ok) {
     alert('Failed to save calibration: ' + (await res.text()));
+  } else {
+    alert('Calibration saved successfully');
+    refreshConfig();
   }
 });
 
