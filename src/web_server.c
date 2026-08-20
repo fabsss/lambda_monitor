@@ -304,8 +304,17 @@ static esp_err_t autocal_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* Android connectivity check: respond with 204 No Content.
+ * This prevents Android from showing "No Internet" warning on the AP. */
+static esp_err_t connectivity_check_handler(httpd_req_t *req)
+{
+    httpd_resp_set_status(req, "204 No Content");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
 /* Captive portal: redirect unknown URIs to home page.
- * Catches requests to captive.apple.com, connectivitycheck.gstatic.com, etc. */
+ * Catches requests to captive.apple.com, etc. */
 static esp_err_t captive_portal_handler(httpd_req_t *req)
 {
     httpd_resp_set_status(req, "302 Found");
@@ -317,7 +326,7 @@ static esp_err_t captive_portal_handler(httpd_req_t *req)
 void web_server_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 15;
+    config.max_uri_handlers = 16;
     esp_err_t err = httpd_start(&s_server, &config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start failed: %s", esp_err_to_name(err));
@@ -339,6 +348,7 @@ void web_server_start(void)
         { .uri = "/uplot.min.css", .method = HTTP_GET, .handler = uplot_css_get_handler },
         { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },
         { .uri = "/api/ota", .method = HTTP_POST, .handler = ota_post_handler },
+        { .uri = "/generate_204", .method = HTTP_GET, .handler = connectivity_check_handler },
         { .uri = "/*", .method = HTTP_GET, .handler = captive_portal_handler },
     };
 
