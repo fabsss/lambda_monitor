@@ -39,22 +39,28 @@ function renderStackedBar(elId, tWarmup, tLean, tLambda1, tRich) {
 
 let lastLiveMv = 0;
 
-const ws = new WebSocket(`ws://${location.host}/ws`);
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  updateGauge(data.index_fast, data.index_slow_avg);
-  document.getElementById('switch-freq').textContent = data.switches_per_min;
-  document.getElementById('status-text').textContent =
-    data.warmup_state === 0 ? 'Sensor warming up…' : 'Sensor ready';
-  document.getElementById('wizard-live-mv').textContent = data.index_fast;
-  lastLiveMv = data.index_fast;
-};
+async function updateLiveData() {
+  try {
+    const res = await fetch('/api/snapshot');
+    const data = await res.json();
+    updateGauge(data.index_fast, data.index_slow_avg);
+    document.getElementById('switch-freq').textContent = data.switches_per_min;
+    document.getElementById('status-text').textContent =
+      data.warmup_state === 0 ? 'Sensor warming up…' : 'Sensor ready';
+    document.getElementById('wizard-live-mv').textContent = data.raw_mv + ' mV';
+    lastLiveMv = data.raw_mv;
+  } catch (e) {
+    console.error('snapshot fetch failed:', e);
+  }
+}
+setInterval(updateLiveData, 500);
+updateLiveData();
 
 async function refreshStats() {
   const res = await fetch('/api/stats');
-  const s = await res.json();
-  renderStackedBar('session-bar', s.t_warmup_s, s.t_lean_s, s.t_lambda1_s, s.t_rich_s);
-  renderStackedBar('longterm-bar', s.t_warmup_s, s.t_lean_s, s.t_lambda1_s, s.t_rich_s);
+  const data = await res.json();
+  renderStackedBar('session-bar', data.session.t_warmup_s, data.session.t_lean_s, data.session.t_lambda1_s, data.session.t_rich_s);
+  renderStackedBar('longterm-bar', data.t_warmup_s, data.t_lean_s, data.t_lambda1_s, data.t_rich_s);
 }
 setInterval(refreshStats, 2000);
 refreshStats();

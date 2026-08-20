@@ -33,17 +33,28 @@ static esp_err_t app_js_get_handler(httpd_req_t *req)
 
 static esp_err_t stats_get_handler(httpd_req_t *req)
 {
-    lambda_longterm_stats_t stats;
-    nvs_store_load_stats(&stats);
+    lambda_longterm_stats_t longterm, session;
+    nvs_store_load_stats(&longterm);
+    adc_task_get_session_stats(&session);
 
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "t_warmup_s", stats.t_warmup_s);
-    cJSON_AddNumberToObject(root, "t_lean_s", stats.t_lean_s);
-    cJSON_AddNumberToObject(root, "t_lambda1_s", stats.t_lambda1_s);
-    cJSON_AddNumberToObject(root, "t_rich_s", stats.t_rich_s);
-    cJSON_AddNumberToObject(root, "index_min", stats.index_min);
-    cJSON_AddNumberToObject(root, "index_max", stats.index_max);
-    cJSON_AddNumberToObject(root, "total_runtime_s", stats.total_runtime_s);
+    cJSON_AddNumberToObject(root, "t_warmup_s", longterm.t_warmup_s);
+    cJSON_AddNumberToObject(root, "t_lean_s", longterm.t_lean_s);
+    cJSON_AddNumberToObject(root, "t_lambda1_s", longterm.t_lambda1_s);
+    cJSON_AddNumberToObject(root, "t_rich_s", longterm.t_rich_s);
+    cJSON_AddNumberToObject(root, "index_min", longterm.index_min);
+    cJSON_AddNumberToObject(root, "index_max", longterm.index_max);
+    cJSON_AddNumberToObject(root, "total_runtime_s", longterm.total_runtime_s);
+
+    cJSON *session_obj = cJSON_CreateObject();
+    cJSON_AddNumberToObject(session_obj, "t_warmup_s", session.t_warmup_s);
+    cJSON_AddNumberToObject(session_obj, "t_lean_s", session.t_lean_s);
+    cJSON_AddNumberToObject(session_obj, "t_lambda1_s", session.t_lambda1_s);
+    cJSON_AddNumberToObject(session_obj, "t_rich_s", session.t_rich_s);
+    cJSON_AddNumberToObject(session_obj, "index_min", session.index_min);
+    cJSON_AddNumberToObject(session_obj, "index_max", session.index_max);
+    cJSON_AddNumberToObject(session_obj, "total_runtime_s", session.total_runtime_s);
+    cJSON_AddItemToObject(root, "session", session_obj);
 
     char *json = cJSON_PrintUnformatted(root);
     httpd_resp_set_type(req, "application/json");
@@ -155,6 +166,28 @@ static esp_err_t ota_post_handler(httpd_req_t *req)
     return ota_task_handle_upload(req);
 }
 
+static esp_err_t snapshot_get_handler(httpd_req_t *req)
+{
+    adc_snapshot_t snap;
+    adc_task_get_snapshot(&snap);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "index_fast", snap.index_fast);
+    cJSON_AddNumberToObject(root, "index_slow_avg", snap.index_slow_avg);
+    cJSON_AddNumberToObject(root, "category", snap.category);
+    cJSON_AddNumberToObject(root, "warmup_state", snap.warmup_state);
+    cJSON_AddNumberToObject(root, "switches_per_min", snap.switches_per_min);
+    cJSON_AddNumberToObject(root, "seconds_since_last_edge", snap.seconds_since_last_edge);
+    cJSON_AddNumberToObject(root, "raw_mv", snap.raw_mv);
+
+    char *json = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    cJSON_free(json);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 static esp_err_t ws_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
@@ -187,7 +220,7 @@ static esp_err_t ws_handler(httpd_req_t *req)
 void web_server_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 12;
+    config.max_uri_handlers = 13;
     httpd_start(&s_server, &config);
 
     httpd_uri_t uris[] = {
@@ -198,6 +231,7 @@ void web_server_start(void)
         { .uri = "/api/reset", .method = HTTP_POST, .handler = reset_post_handler },
         { .uri = "/api/config", .method = HTTP_GET, .handler = config_get_handler },
         { .uri = "/api/config", .method = HTTP_POST, .handler = config_post_handler },
+        { .uri = "/api/snapshot", .method = HTTP_GET, .handler = snapshot_get_handler },
         { .uri = "/uplot.min.js", .method = HTTP_GET, .handler = uplot_js_get_handler },
         { .uri = "/uplot.min.css", .method = HTTP_GET, .handler = uplot_css_get_handler },
         { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },

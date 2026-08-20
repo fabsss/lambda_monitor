@@ -29,6 +29,7 @@ static warmup_fsm_t s_warmup;
 static switch_detector_t s_switch;
 static ring_buffer_t s_ring;
 static lambda_longterm_stats_t s_longterm;
+static lambda_longterm_stats_t s_session;
 static adc_snapshot_t s_snapshot;
 static uint32_t s_dirty_seconds = 0;
 #define STATS_COMMIT_INTERVAL_S 30
@@ -48,6 +49,8 @@ static void adc_task_fn(void *arg)
         int32_t index_fast = si_mv_to_index(&s_cal, fast_mv);
         si_category_t category = si_index_to_category(&s_cal, index_fast);
 
+        xSemaphoreTake(s_mutex, portMAX_DELAY);
+        s_snapshot.raw_mv = raw_mv;
         int64_t now_us = esp_timer_get_time();
         if (now_us - last_second_us >= 1000000) {
             uint32_t delta_s = (uint32_t)((now_us - last_second_us) / 1000000);
@@ -57,8 +60,9 @@ static void adc_task_fn(void *arg)
             warmup_fsm_tick(&s_warmup, delta_s, edge);
             slow_filter_push(&s_slow, index_fast, delta_s);
             ring_buffer_push(&s_ring, index_fast, (uint32_t)(now_us / 1000000));
-            lambda_stats_accumulate(&s_longterm, category, index_fast, delta_s,
-                                     s_warmup.state == WARMUP_STATE_WARMUP);
+            bool in_warmup = s_warmup.state == WARMUP_STATE_WARMUP;
+            lambda_stats_accumulate(&s_longterm, category, index_fast, delta_s, in_warmup);
+            lambda_stats_accumulate(&s_session, category, index_fast, delta_s, in_warmup);
 
             s_dirty_seconds += delta_s;
             if (s_dirty_seconds >= STATS_COMMIT_INTERVAL_S) {
@@ -66,15 +70,14 @@ static void adc_task_fn(void *arg)
                 s_dirty_seconds = 0;
             }
 
-            xSemaphoreTake(s_mutex, portMAX_DELAY);
             s_snapshot.index_fast = index_fast;
             s_snapshot.index_slow_avg = slow_filter_average(&s_slow);
             s_snapshot.category = category;
             s_snapshot.warmup_state = s_warmup.state;
             s_snapshot.switches_per_min = s_switch.switches_per_min;
             s_snapshot.seconds_since_last_edge = s_switch.seconds_since_last_edge;
-            xSemaphoreGive(s_mutex);
         }
+        xSemaphoreGive(s_mutex);
 
         vTaskDelay(pdMS_TO_TICKS(SAMPLE_PERIOD_MS));
     }
@@ -90,6 +93,7 @@ void adc_task_start(int adc1_channel)
     switch_detector_init(&s_switch);
     ring_buffer_init(&s_ring);
     nvs_store_load_stats(&s_longterm);
+    lambda_stats_reset(&s_session);
     nvs_store_load_config(&s_cal);
 
     adc_oneshot_unit_init_cfg_t init_cfg = { .unit_id = ADC_UNIT_1 };
@@ -140,5 +144,12 @@ void adc_task_set_calibration(const si_calibration_t *cal)
 {
     xSemaphoreTake(s_mutex, portMAX_DELAY);
     s_cal = *cal;
+    xSemaphoreGive(s_mutex);
+}
+
+void adc_task_get_session_stats(lambda_longterm_stats_t *out)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    *out = s_session;
     xSemaphoreGive(s_mutex);
 }
