@@ -11,6 +11,7 @@
     <button data-tab="live" class="tab-btn active">Live</button>
     <button data-tab="chart" class="tab-btn">Chart</button>
     <button data-tab="settings" class="tab-btn">Settings</button>
+    <button data-tab="ota" class="tab-btn">Firmware Update</button>
   </nav>
 
   <section id="tab-live" class="tab-panel active">
@@ -52,6 +53,14 @@
       <button id="wizard-set-min">Take as u_min (lean)</button>
       <button id="wizard-set-max">Take as u_max (rich)</button>
     </div>
+  </section>
+
+  <section id="tab-ota" class="tab-panel">
+    <form id="ota-form">
+      <input type="file" id="ota-file" accept=".bin">
+      <button type="submit">Upload &amp; Flash</button>
+    </form>
+    <progress id="ota-progress" value="0" max="100"></progress>
   </section>
 
   <script src="/uplot.min.js"></script>

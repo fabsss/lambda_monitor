@@ -5,6 +5,7 @@
 #include "lambda_stats.h"
 #include "signal_interpreter.h"
 #include "ring_buffer.h"
+#include "ota_task.h"
 
 #include "esp_http_server.h"
 #include "cJSON.h"
@@ -141,6 +142,11 @@ static esp_err_t curve_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t ota_post_handler(httpd_req_t *req)
+{
+    return ota_task_handle_upload(req);
+}
+
 static esp_err_t ws_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
@@ -173,6 +179,7 @@ static esp_err_t ws_handler(httpd_req_t *req)
 void web_server_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 12;
     httpd_start(&s_server, &config);
 
     httpd_uri_t uris[] = {
@@ -186,6 +193,7 @@ void web_server_start(void)
         { .uri = "/uplot.min.js", .method = HTTP_GET, .handler = uplot_js_get_handler },
         { .uri = "/uplot.min.css", .method = HTTP_GET, .handler = uplot_css_get_handler },
         { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },
+        { .uri = "/api/ota", .method = HTTP_POST, .handler = ota_post_handler },
         { .uri = "/ws", .method = HTTP_GET, .handler = ws_handler, .is_websocket = true },
     };
 

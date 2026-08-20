@@ -129,3 +129,22 @@ document.getElementById('freeze-btn').addEventListener('click', () => {
   frozen = !frozen;
   document.getElementById('freeze-btn').textContent = frozen ? 'Resume' : 'Freeze';
 });
+
+document.getElementById('ota-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = document.getElementById('ota-file').files[0];
+  if (!file) return;
+  if (!confirm(`Flash firmware "${file.name}" (${file.size} bytes)? The device will reboot.`)) {
+    return;
+  }
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/ota');
+  xhr.upload.addEventListener('progress', (evt) => {
+    if (evt.lengthComputable) {
+      document.getElementById('ota-progress').value = (evt.loaded / evt.total) * 100;
+    }
+  });
+  xhr.onload = () => alert('Upload complete, device is rebooting.');
+  xhr.send(file);
+});
