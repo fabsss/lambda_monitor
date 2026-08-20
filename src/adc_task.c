@@ -6,6 +6,7 @@
 #include "ring_buffer.h"
 #include "lambda_stats.h"
 #include "nvs_store.h"
+#include "calib_wizard.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -34,6 +35,11 @@ static adc_snapshot_t s_snapshot;
 static uint32_t s_dirty_seconds = 0;
 #define STATS_COMMIT_INTERVAL_S 30
 
+#define AUTOCAL_BUFFER_SIZE 100
+static int32_t s_autocal_buffer[AUTOCAL_BUFFER_SIZE];
+static uint32_t s_autocal_count = 0;
+static bool s_autocal_active = false;
+
 static void adc_task_fn(void *arg)
 {
     (void)arg;
@@ -50,6 +56,9 @@ static void adc_task_fn(void *arg)
         si_category_t category = si_index_to_category(&s_cal, index_fast);
 
         xSemaphoreTake(s_mutex, portMAX_DELAY);
+        if (s_autocal_active && s_autocal_count < AUTOCAL_BUFFER_SIZE) {
+            s_autocal_buffer[s_autocal_count++] = raw_mv;
+        }
         s_snapshot.raw_mv = raw_mv;
         int64_t now_us = esp_timer_get_time();
         if (now_us - last_second_us >= 1000000) {
@@ -152,4 +161,34 @@ void adc_task_get_session_stats(lambda_longterm_stats_t *out)
     xSemaphoreTake(s_mutex, portMAX_DELAY);
     *out = s_session;
     xSemaphoreGive(s_mutex);
+}
+
+void adc_task_autocal_start(void)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    s_autocal_active = true;
+    s_autocal_count = 0;
+    xSemaphoreGive(s_mutex);
+}
+
+void adc_task_autocal_stop_and_derive(si_calibration_t *out_cal)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    s_autocal_active = false;
+    uint32_t count = s_autocal_count;
+    xSemaphoreGive(s_mutex);
+
+    if (count > 0) {
+        calib_auto_derive(s_autocal_buffer, count, out_cal);
+    } else {
+        si_default_calibration(out_cal);
+    }
+}
+
+uint32_t adc_task_autocal_count(void)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    uint32_t count = s_autocal_count;
+    xSemaphoreGive(s_mutex);
+    return count;
 }

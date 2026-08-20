@@ -48,10 +48,16 @@
       <button type="submit">Save</button>
     </form>
     <div id="wizard">
-      <p>Live voltage: <span id="wizard-live-mv">-</span> mV</p>
+      <p>Live voltage: <span id="wizard-live-mv">-</span></p>
       <button id="wizard-set-lambda1">Take as λ=1</button>
       <button id="wizard-set-min">Take as u_min (lean)</button>
       <button id="wizard-set-max">Take as u_max (rich)</button>
+      <hr>
+      <p>Auto-calibration:</p>
+      <button id="wizard-autocal-start">Start sampling</button>
+      <button id="wizard-autocal-derive">Derive &amp; apply</button>
+      <p id="wizard-autocal-status">Ready</p>
+      <p id="wizard-autocal-progress">0/100 samples</p>
     </div>
   </section>
 

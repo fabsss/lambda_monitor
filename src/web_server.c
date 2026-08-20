@@ -188,6 +188,75 @@ static esp_err_t snapshot_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t autocal_post_handler(httpd_req_t *req)
+{
+    char buf[128];
+    int len = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (len <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
+        return ESP_FAIL;
+    }
+    buf[len] = '\0';
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "JSON parse error");
+        return ESP_FAIL;
+    }
+
+    cJSON *action_item = cJSON_GetObjectItem(root, "action");
+    if (!action_item || !action_item->valuestring) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing action");
+        return ESP_FAIL;
+    }
+
+    const char *action = action_item->valuestring;
+    cJSON_Delete(root);
+
+    if (strcmp(action, "start") == 0) {
+        adc_task_autocal_start();
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, "{\"ok\":true}", HTTPD_RESP_USE_STRLEN);
+    } else if (strcmp(action, "derive") == 0) {
+        si_calibration_t cal;
+        adc_task_autocal_stop_and_derive(&cal);
+        nvs_store_save_config(&cal);
+        adc_task_set_calibration(&cal);
+
+        cJSON *resp = cJSON_CreateObject();
+        cJSON_AddNumberToObject(resp, "u_min_mv", cal.u_min_mv);
+        cJSON_AddNumberToObject(resp, "u_max_mv", cal.u_max_mv);
+        cJSON_AddNumberToObject(resp, "u_lambda1_mv", cal.u_lambda1_mv);
+        cJSON_AddNumberToObject(resp, "deadband_mv", cal.deadband_mv);
+        char *json = cJSON_PrintUnformatted(resp);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+        cJSON_free(json);
+        cJSON_Delete(resp);
+    } else {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Unknown action");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+static esp_err_t autocal_get_handler(httpd_req_t *req)
+{
+    uint32_t count = adc_task_autocal_count();
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "count", count);
+    cJSON_AddNumberToObject(root, "max", 100);
+
+    char *json = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    cJSON_free(json);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 static esp_err_t ws_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
@@ -220,7 +289,7 @@ static esp_err_t ws_handler(httpd_req_t *req)
 void web_server_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 13;
+    config.max_uri_handlers = 15;
     httpd_start(&s_server, &config);
 
     httpd_uri_t uris[] = {
@@ -232,6 +301,8 @@ void web_server_start(void)
         { .uri = "/api/config", .method = HTTP_GET, .handler = config_get_handler },
         { .uri = "/api/config", .method = HTTP_POST, .handler = config_post_handler },
         { .uri = "/api/snapshot", .method = HTTP_GET, .handler = snapshot_get_handler },
+        { .uri = "/api/calibrate/auto", .method = HTTP_GET, .handler = autocal_get_handler },
+        { .uri = "/api/calibrate/auto", .method = HTTP_POST, .handler = autocal_post_handler },
         { .uri = "/uplot.min.js", .method = HTTP_GET, .handler = uplot_js_get_handler },
         { .uri = "/uplot.min.css", .method = HTTP_GET, .handler = uplot_css_get_handler },
         { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },

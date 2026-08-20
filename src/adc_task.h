@@ -21,5 +21,8 @@ void adc_task_get_snapshot(adc_snapshot_t *out);
 void adc_task_get_curve(int32_t *out_values, uint32_t *out_timestamps, uint16_t max_points, uint16_t *out_count);
 void adc_task_set_calibration(const si_calibration_t *cal);
 void adc_task_get_session_stats(lambda_longterm_stats_t *out);
+void adc_task_autocal_start(void);
+void adc_task_autocal_stop_and_derive(si_calibration_t *out_cal);
+uint32_t adc_task_autocal_count(void);
 
 #endif

@@ -92,6 +92,39 @@ document.getElementById('wizard-set-max').addEventListener('click', () => {
   document.querySelector('[name=u_max_mv]').value = lastLiveMv;
 });
 
+let autocal_running = false;
+document.getElementById('wizard-autocal-start').addEventListener('click', async () => {
+  autocal_running = true;
+  document.getElementById('wizard-autocal-status').textContent = 'Collecting samples...';
+  await fetch('/api/calibrate/auto', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'start' })
+  });
+});
+
+document.getElementById('wizard-autocal-derive').addEventListener('click', async () => {
+  autocal_running = false;
+  document.getElementById('wizard-autocal-status').textContent = 'Deriving calibration...';
+  const res = await fetch('/api/calibrate/auto', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'derive' })
+  });
+  const cal = await res.json();
+  document.querySelector('[name=u_min_mv]').value = cal.u_min_mv;
+  document.querySelector('[name=u_max_mv]').value = cal.u_max_mv;
+  document.querySelector('[name=u_lambda1_mv]').value = cal.u_lambda1_mv;
+  document.querySelector('[name=deadband_mv]').value = cal.deadband_mv;
+  document.getElementById('wizard-autocal-status').textContent = 'Done! Review and save.';
+});
+
+async function updateAutocalStatus() {
+  if (!autocal_running) return;
+  const res = await fetch('/api/calibrate/auto');
+  const data = await res.json();
+  document.getElementById('wizard-autocal-progress').textContent = `${data.count}/${data.max} samples`;
+}
+setInterval(updateAutocalStatus, 200);
+
 let chartWindowS = 60;
 let frozen = false;
 
