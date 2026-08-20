@@ -5,10 +5,10 @@
  */
 void si_default_calibration(si_calibration_t *cal)
 {
-    cal->u_min_mv = 0;
-    cal->u_max_mv = 3000;
-    cal->u_lambda1_mv = 1500;
-    cal->deadband_mv = 150;
+    cal->u_min_mv = 320;      /* Bosch step lambda: 0.1V × 3.2 gain = 320 mV (lean) */
+    cal->u_max_mv = 2880;     /* Bosch step lambda: 0.9V × 3.2 gain = 2880 mV (rich) */
+    cal->u_lambda1_mv = 1600; /* Midpoint of 320–2880 mV range (stoichiometric) */
+    cal->deadband_mv = 160;   /* ~5.6% of range for hysteresis tolerance */
     cal->thresh_very_lean = -60;
     cal->thresh_lean = -20;
     cal->thresh_rich = 20;

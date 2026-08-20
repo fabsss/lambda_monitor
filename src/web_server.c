@@ -16,7 +16,9 @@
 static const char *TAG = "web_server";
 static httpd_handle_t s_server = NULL;
 
-/* ADC1 attenuated full-scale range (ADC_ATTEN_DB_12, see adc_task.c). */
+/* ADC1 attenuated full-scale range (ADC_ATTEN_DB_12, see adc_task.c).
+ * Bosch step lambda sensor with 3.2× op-amp gain operates in ~320–2880 mV range,
+ * but we allow the full 0–3300 mV range for flexibility (future sensors, debug). */
 #define ADC_MV_MIN 0
 #define ADC_MV_MAX 3300
 
@@ -302,10 +304,20 @@ static esp_err_t autocal_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* Captive portal: redirect unknown URIs to home page.
+ * Catches requests to captive.apple.com, connectivitycheck.gstatic.com, etc. */
+static esp_err_t captive_portal_handler(httpd_req_t *req)
+{
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
 void web_server_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 14;
+    config.max_uri_handlers = 15;
     esp_err_t err = httpd_start(&s_server, &config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start failed: %s", esp_err_to_name(err));
@@ -327,6 +339,7 @@ void web_server_start(void)
         { .uri = "/uplot.min.css", .method = HTTP_GET, .handler = uplot_css_get_handler },
         { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },
         { .uri = "/api/ota", .method = HTTP_POST, .handler = ota_post_handler },
+        { .uri = "/*", .method = HTTP_GET, .handler = captive_portal_handler },
     };
 
     for (size_t i = 0; i < sizeof(uris) / sizeof(uris[0]); i++) {

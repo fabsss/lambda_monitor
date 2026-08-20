@@ -36,11 +36,11 @@ typedef enum {
  *
  * @param cal Pointer to calibration structure to initialize.
  *
- * Default values:
- *  - u_min_mv = 0
- *  - u_max_mv = 3000
- *  - u_lambda1_mv = 1500
- *  - deadband_mv = 150
+ * Default values (Bosch step lambda sensor with 3.2× op-amp gain):
+ *  - u_min_mv = 320 (0.1V raw × 3.2 = lean extreme)
+ *  - u_max_mv = 2880 (0.9V raw × 3.2 = rich extreme)
+ *  - u_lambda1_mv = 1600 (stoichiometric midpoint)
+ *  - deadband_mv = 160 (~5.6% hysteresis tolerance)
  *  - thresh_very_lean = -60
  *  - thresh_lean = -20
  *  - thresh_rich = 20
