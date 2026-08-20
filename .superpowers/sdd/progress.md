@@ -16,13 +16,15 @@
 - [x] Task 6: Fixed-size ring buffer (2f2a17f)
 - [x] Task 7: CRC32 + statistics struct (541459a)
 - [x] Task 8: Calibration wizard math (ba71057)
-- [ ] Task 9: ADC sampling task
-- [ ] Task 10: NVS persistence
+- [x] Task 9: ADC sampling task (4cc10a5) — completed, build/tests verified
+- [x] Task 10: NVS persistence (1799b0f) — build verified (`pio run -e esp32s3` SUCCESS); native tests
+      not runnable on this machine (no host gcc toolchain, pre-existing gap noted in Task 9)
 - [ ] Task 11: WiFi SoftAP + HTTP/WebSocket server
 - [ ] Task 12: Frontend (gauge, chart, settings)
 - [ ] Task 13: Screen 2 chart (uPlot)
 - [ ] Task 14: OTA firmware update
 
 **Phase B Complete:** All 46 host tests pass. Core logic ready for hardware integration.
+**Phase C Progress:** Tasks 9–10 done (ADC + NVS persistence wired). Tasks 11–14 pending.
 
 ---
