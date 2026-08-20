@@ -1,5 +1,6 @@
 Import("env")
 import os
+import hashlib
 
 WEB_DIR = os.path.join(env["PROJECT_DIR"], "web")
 OUT_FILE = os.path.join(env["PROJECT_DIR"], "src", "frontend_assets.h")
@@ -18,8 +19,37 @@ def c_escape(text):
                 .replace("?", "\\?")
                 .replace("\n", "\\n\"\n    \""))
 
+def compute_hash():
+    """Compute hash of all web files to detect changes."""
+    hasher = hashlib.md5()
+    for _, filename in FILES:
+        path = os.path.join(WEB_DIR, filename)
+        with open(path, "rb") as f:
+            hasher.update(f.read())
+    return hasher.hexdigest()
+
 def generate():
-    lines = ["#ifndef FRONTEND_ASSETS_H", "#define FRONTEND_ASSETS_H", ""]
+    """Generate frontend_assets.h only if web files changed."""
+    current_hash = compute_hash()
+
+    # Check if output exists and has matching hash
+    if os.path.exists(OUT_FILE):
+        try:
+            with open(OUT_FILE, "r", encoding="utf-8") as f:
+                content = f.read()
+                # Extract hash from comment at top of file
+                for line in content.split("\n"):
+                    if line.startswith("// Hash: "):
+                        stored_hash = line.split(": ")[1]
+                        if stored_hash == current_hash:
+                            print(f"[frontend_assets.h] Up to date (hash: {current_hash[:8]}...)")
+                            return
+        except:
+            pass
+
+    # Regenerate
+    print(f"[frontend_assets.h] Regenerating (hash changed)")
+    lines = [f"// Hash: {current_hash}", "#ifndef FRONTEND_ASSETS_H", "#define FRONTEND_ASSETS_H", ""]
     for var_name, filename in FILES:
         path = os.path.join(WEB_DIR, filename)
         with open(path, "r", encoding="utf-8") as f:
