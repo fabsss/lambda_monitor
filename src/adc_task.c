@@ -118,3 +118,20 @@ void adc_task_get_snapshot(adc_snapshot_t *out)
     *out = s_snapshot;
     xSemaphoreGive(s_mutex);
 }
+
+void adc_task_get_curve(int32_t *out_values, uint32_t *out_timestamps, uint16_t max_points, uint16_t *out_count)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    uint16_t count = ring_buffer_count(&s_ring);
+    if (count > max_points) count = max_points;
+
+    uint16_t start = ring_buffer_count(&s_ring) - count;
+    for (uint16_t i = 0; i < count; i++) {
+        int32_t val; uint32_t ts;
+        ring_buffer_get(&s_ring, (uint16_t)(start + i), &val, &ts);
+        out_values[i] = val;
+        out_timestamps[i] = ts;
+    }
+    *out_count = count;
+    xSemaphoreGive(s_mutex);
+}

@@ -8,11 +8,14 @@ FILES = [
     ("INDEX_HTML", "index.html"),
     ("STYLE_CSS", "style.css"),
     ("APP_JS", "app.js"),
+    ("UPLOT_JS", "uplot.min.js"),
+    ("UPLOT_CSS", "uplot.min.css"),
 ]
 
 def c_escape(text):
     return (text.replace("\\", "\\\\")
                 .replace('"', '\\"')
+                .replace("?", "\\?")
                 .replace("\n", "\\n\"\n    \""))
 
 def generate():

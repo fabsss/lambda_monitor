@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Lambda Monitor</title>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/uplot.min.css">
 </head>
 <body>
   <nav>
@@ -28,6 +29,11 @@
   </section>
 
   <section id="tab-chart" class="tab-panel">
+    <div>
+      <button data-window="10">10s</button>
+      <button data-window="30">30s</button>
+      <button data-window="60" class="active">60s</button>
+    </div>
     <div id="chart"></div>
     <button id="freeze-btn">Freeze</button>
   </section>
@@ -48,6 +54,7 @@
     </div>
   </section>
 
+  <script src="/uplot.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

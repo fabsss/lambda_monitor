@@ -4,6 +4,7 @@
 #include "nvs_store.h"
 #include "lambda_stats.h"
 #include "signal_interpreter.h"
+#include "ring_buffer.h"
 
 #include "esp_http_server.h"
 #include "cJSON.h"
@@ -103,6 +104,43 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t uplot_js_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/javascript");
+    return httpd_resp_send(req, UPLOT_JS, HTTPD_RESP_USE_STRLEN);
+}
+
+static esp_err_t uplot_css_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/css");
+    return httpd_resp_send(req, UPLOT_CSS, HTTPD_RESP_USE_STRLEN);
+}
+
+static esp_err_t curve_get_handler(httpd_req_t *req)
+{
+    static int32_t values[RING_BUFFER_CAPACITY];
+    static uint32_t timestamps[RING_BUFFER_CAPACITY];
+    uint16_t count;
+    adc_task_get_curve(values, timestamps, RING_BUFFER_CAPACITY, &count);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *values_arr = cJSON_CreateArray();
+    cJSON *ts_arr = cJSON_CreateArray();
+    for (uint16_t i = 0; i < count; i++) {
+        cJSON_AddItemToArray(values_arr, cJSON_CreateNumber(values[i]));
+        cJSON_AddItemToArray(ts_arr, cJSON_CreateNumber(timestamps[i]));
+    }
+    cJSON_AddItemToObject(root, "index_values", values_arr);
+    cJSON_AddItemToObject(root, "timestamps_s", ts_arr);
+
+    char *json = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    cJSON_free(json);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 static esp_err_t ws_handler(httpd_req_t *req)
 {
     if (req->method == HTTP_GET) {
@@ -145,6 +183,9 @@ void web_server_start(void)
         { .uri = "/api/reset", .method = HTTP_POST, .handler = reset_post_handler },
         { .uri = "/api/config", .method = HTTP_GET, .handler = config_get_handler },
         { .uri = "/api/config", .method = HTTP_POST, .handler = config_post_handler },
+        { .uri = "/uplot.min.js", .method = HTTP_GET, .handler = uplot_js_get_handler },
+        { .uri = "/uplot.min.css", .method = HTTP_GET, .handler = uplot_css_get_handler },
+        { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },
         { .uri = "/ws", .method = HTTP_GET, .handler = ws_handler, .is_websocket = true },
     };
 

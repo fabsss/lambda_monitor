@@ -82,3 +82,50 @@ document.getElementById('wizard-set-min').addEventListener('click', () => {
 document.getElementById('wizard-set-max').addEventListener('click', () => {
   document.querySelector('[name=u_max_mv]').value = lastLiveMv;
 });
+
+let chartWindowS = 60;
+let frozen = false;
+
+const chartData = [[], []];
+const uplotInstance = new uPlot({
+  width: 600,
+  height: 300,
+  series: [
+    {},
+    { label: 'Mixture Index', stroke: 'green', width: 2 },
+  ],
+  scales: { y: { range: [-100, 100] } },
+}, chartData, document.getElementById('chart'));
+
+async function refreshChart() {
+  if (frozen) return;
+  const res = await fetch('/api/curve');
+  const data = await res.json();
+  const now = data.timestamps_s.length ? data.timestamps_s[data.timestamps_s.length - 1] : 0;
+  const cutoff = now - chartWindowS;
+
+  const xs = [];
+  const ys = [];
+  for (let i = 0; i < data.timestamps_s.length; i++) {
+    if (data.timestamps_s[i] >= cutoff) {
+      xs.push(data.timestamps_s[i]);
+      ys.push(data.index_values[i]);
+    }
+  }
+  uplotInstance.setData([xs, ys]);
+}
+setInterval(refreshChart, 1000);
+
+document.querySelectorAll('[data-window]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-window]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chartWindowS = parseInt(btn.dataset.window, 10);
+    refreshChart();
+  });
+});
+
+document.getElementById('freeze-btn').addEventListener('click', () => {
+  frozen = !frozen;
+  document.getElementById('freeze-btn').textContent = frozen ? 'Resume' : 'Freeze';
+});

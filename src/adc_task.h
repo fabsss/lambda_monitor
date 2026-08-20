@@ -16,5 +16,6 @@ typedef struct {
 
 void adc_task_start(int adc1_channel);
 void adc_task_get_snapshot(adc_snapshot_t *out);
+void adc_task_get_curve(int32_t *out_values, uint32_t *out_timestamps, uint16_t max_points, uint16_t *out_count);
 
 #endif
