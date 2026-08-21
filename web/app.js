@@ -28,17 +28,32 @@ function renderStackedBar(elId, tWarmup, tLean, tLambda1, tRich) {
   const el = document.getElementById(elId);
   el.innerHTML = '';
   if (total === 0) return;
+
   const segments = [
-    ['bar-warmup', tWarmup], ['bar-lean', tLean],
-    ['bar-lambda1', tLambda1], ['bar-rich', tRich],
+    ['bar-warmup', tWarmup, 'Warmup'],
+    ['bar-lean', tLean, 'Lean'],
+    ['bar-lambda1', tLambda1, 'λ=1'],
+    ['bar-rich', tRich, 'Rich'],
   ];
-  for (const [cls, seconds] of segments) {
+
+  for (const [cls, seconds, label] of segments) {
     const pct = (seconds / total) * 100;
     if (pct <= 0) continue;
     const div = document.createElement('div');
     div.className = cls;
     div.style.width = pct + '%';
+    div.title = `${label}: ${seconds}s (${pct.toFixed(1)}%)`;
     el.appendChild(div);
+  }
+
+  const labelsEl = document.getElementById(elId.replace('bar', 'labels'));
+  if (labelsEl) {
+    labelsEl.innerHTML = `
+      <span>Warmup: ${tWarmup}s (${total ? (tWarmup/total*100).toFixed(1) : 0}%)</span>
+      <span>Lean: ${tLean}s (${total ? (tLean/total*100).toFixed(1) : 0}%)</span>
+      <span>λ=1: ${tLambda1}s (${total ? (tLambda1/total*100).toFixed(1) : 0}%)</span>
+      <span>Rich: ${tRich}s (${total ? (tRich/total*100).toFixed(1) : 0}%)</span>
+    `;
   }
 }
 
@@ -122,76 +137,129 @@ document.getElementById('wizard-set-max').addEventListener('click', () => {
 });
 
 let autocal_running = false;
+
 document.getElementById('wizard-autocal-start').addEventListener('click', async () => {
-  autocal_running = true;
-  document.getElementById('wizard-autocal-status').textContent = 'Collecting samples...';
-  await fetch('/api/calibrate/auto', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'start' })
-  });
+  try {
+    autocal_running = true;
+    document.getElementById('wizard-autocal-status').textContent = 'Collecting samples...';
+    document.getElementById('wizard-autocal-progress').textContent = '0/100 samples';
+    const res = await fetch('/api/calibrate/auto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'start' })
+    });
+    if (!res.ok) {
+      document.getElementById('wizard-autocal-status').textContent = 'Error starting calibration';
+      autocal_running = false;
+    }
+  } catch (e) {
+    console.error('autocal start failed:', e);
+    autocal_running = false;
+  }
 });
 
 document.getElementById('wizard-autocal-derive').addEventListener('click', async () => {
-  autocal_running = false;
-  document.getElementById('wizard-autocal-status').textContent = 'Deriving calibration...';
-  const res = await fetch('/api/calibrate/auto', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'derive' })
-  });
-  const cal = await res.json();
-  document.querySelector('[name=u_min_mv]').value = cal.u_min_mv;
-  document.querySelector('[name=u_max_mv]').value = cal.u_max_mv;
-  document.querySelector('[name=u_lambda1_mv]').value = cal.u_lambda1_mv;
-  document.querySelector('[name=deadband_mv]').value = cal.deadband_mv;
-  document.getElementById('wizard-autocal-status').textContent = 'Done! Review and save.';
+  try {
+    autocal_running = false;
+    document.getElementById('wizard-autocal-status').textContent = 'Deriving calibration...';
+    const res = await fetch('/api/calibrate/auto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'derive' })
+    });
+    if (!res.ok) {
+      document.getElementById('wizard-autocal-status').textContent = 'Error deriving calibration';
+      return;
+    }
+    const cal = await res.json();
+    document.querySelector('[name=u_min_mv]').value = cal.u_min_mv;
+    document.querySelector('[name=u_max_mv]').value = cal.u_max_mv;
+    document.querySelector('[name=u_lambda1_mv]').value = cal.u_lambda1_mv;
+    document.querySelector('[name=deadband_mv]').value = cal.deadband_mv;
+    document.getElementById('wizard-autocal-status').textContent = 'Done! Review and save.';
+    document.getElementById('wizard-autocal-progress').textContent = '0/100 samples';
+  } catch (e) {
+    console.error('autocal derive failed:', e);
+    document.getElementById('wizard-autocal-status').textContent = 'Error deriving calibration';
+  }
 });
 
 async function updateAutocalStatus() {
   if (!autocal_running) return;
-  const res = await fetch('/api/calibrate/auto');
-  const data = await res.json();
-  document.getElementById('wizard-autocal-progress').textContent = `${data.count}/${data.max} samples`;
+  try {
+    const res = await fetch('/api/calibrate/auto');
+    const data = await res.json();
+    document.getElementById('wizard-autocal-progress').textContent = `${data.count}/${data.max} samples`;
+    if (data.count >= data.max) {
+      document.getElementById('wizard-autocal-status').textContent = 'Collection complete (100 samples). Click "Derive & apply" to analyze.';
+    }
+  } catch (e) {
+    console.error('autocal status fetch failed:', e);
+  }
 }
-setInterval(updateAutocalStatus, 200);
+setInterval(updateAutocalStatus, 500);
 
 let chartWindowS = 60;
 let frozen = false;
 
 const chartContainer = document.getElementById('chart');
-const chartData = [[], []];
+const chartData = [[], [], [], []];
+
 const uplotInstance = new uPlot({
   width: chartContainer.clientWidth,
-  height: 300,
+  height: 350,
   series: [
-    {},
-    { label: 'Mixture Index', stroke: 'green', width: 2 },
+    { label: 'Time (s)' },
+    { label: 'Voltage (mV)', stroke: '#000', width: 2 },
+    { label: 'Lean zone', stroke: '#ff6b6b', fill: 'rgba(255,107,107,0.1)', width: 0 },
+    { label: 'Rich zone', stroke: '#4dabf7', fill: 'rgba(77,171,247,0.1)', width: 0 },
   ],
-  scales: { y: { range: [-100, 100] } },
+  scales: {
+    x: { time: false },
+    y: { range: [0, 3300] }
+  },
+  axes: [
+    { label: 'Time since start (s)' },
+    { label: 'Voltage (mV)' },
+  ],
 }, chartData, chartContainer);
 
 window.resizeChartToContainer = () => {
-  uplotInstance.setSize({ width: chartContainer.clientWidth, height: 300 });
+  uplotInstance.setSize({ width: chartContainer.clientWidth, height: 350 });
 };
 window.addEventListener('resize', window.resizeChartToContainer);
 
 async function refreshChart() {
   if (frozen) return;
-  const res = await fetch('/api/curve');
-  const data = await res.json();
-  const now = data.timestamps_s.length ? data.timestamps_s[data.timestamps_s.length - 1] : 0;
-  const cutoff = now - chartWindowS;
+  try {
+    const res = await fetch('/api/curve');
+    const data = await res.json();
+    const configRes = await fetch('/api/config');
+    const config = await configRes.json();
 
-  const xs = [];
-  const ys = [];
-  for (let i = 0; i < data.timestamps_s.length; i++) {
-    if (data.timestamps_s[i] >= cutoff) {
-      xs.push(data.timestamps_s[i]);
-      ys.push(data.index_values[i]);
+    const now = data.timestamps_s.length ? data.timestamps_s[data.timestamps_s.length - 1] : 0;
+    const cutoff = now - chartWindowS;
+
+    const xs = [];
+    const ys = [];
+    const leanZone = [];
+    const richZone = [];
+
+    for (let i = 0; i < data.timestamps_s.length; i++) {
+      const ts = data.timestamps_s[i];
+      if (ts >= cutoff) {
+        const idx = data.index_values[i];
+        const mv = 320 + (idx / 100) * (2880 - 320);
+        xs.push(ts);
+        ys.push(mv);
+        leanZone.push(config.u_lambda1_mv + config.deadband_mv);
+        richZone.push(config.u_lambda1_mv - config.deadband_mv);
+      }
     }
+    uplotInstance.setData([xs, ys, leanZone, richZone]);
+  } catch (e) {
+    console.error('chart refresh failed:', e);
   }
-  uplotInstance.setData([xs, ys]);
 }
 setInterval(refreshChart, 1000);
 

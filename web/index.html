@@ -17,16 +17,38 @@
 
   <section id="tab-live" class="tab-panel active">
     <svg id="gauge" viewBox="0 0 200 120" width="300">
-      <path d="M20,110 A80,80 0 0,1 76,35" stroke="red" stroke-width="12" fill="none"/>
-      <path d="M76,35 A80,80 0 0,1 124,35" stroke="green" stroke-width="12" fill="none"/>
-      <path d="M124,35 A80,80 0 0,1 180,110" stroke="blue" stroke-width="12" fill="none"/>
+      <path d="M20,110 A80,80 0 0,1 76,35" stroke="#ff6b6b" stroke-width="12" fill="none"/>
+      <path d="M76,35 A80,80 0 0,1 124,35" stroke="#51cf66" stroke-width="12" fill="none"/>
+      <path d="M124,35 A80,80 0 0,1 180,110" stroke="#4dabf7" stroke-width="12" fill="none"/>
       <line id="needle-fast" x1="100" y1="110" x2="100" y2="30" stroke="black" stroke-width="3"/>
-      <line id="needle-slow" x1="100" y1="110" x2="100" y2="40" stroke="gray" stroke-width="2"/>
+      <line id="needle-slow" x1="100" y1="110" x2="100" y2="40" stroke="#666" stroke-width="2"/>
     </svg>
+    <div class="gauge-legend">
+      <div class="gauge-legend-item"><span class="gauge-legend-color" style="background:#000;"></span>Fast (0.5s)</div>
+      <div class="gauge-legend-item"><span class="gauge-legend-color" style="background:#666;"></span>Slow (5s avg)</div>
+    </div>
     <p id="status-text">Sensor warming up…</p>
     <p>Switching frequency: <span id="switch-freq">0</span> /min</p>
-    <div id="session-bar" class="stacked-bar"></div>
-    <div id="longterm-bar" class="stacked-bar"></div>
+
+    <div class="stats-section">
+      <div class="stats-section-title">Session Statistics</div>
+      <div id="session-bar" class="stacked-bar"></div>
+      <div id="session-labels" class="stacked-bar-label"></div>
+    </div>
+
+    <div class="stats-section">
+      <div class="stats-section-title">Long-term Statistics</div>
+      <div id="longterm-bar" class="stacked-bar"></div>
+      <div id="longterm-labels" class="stacked-bar-label"></div>
+    </div>
+
+    <div class="stats-legend" style="font-size: 0.8rem; margin-top: 0.5rem;">
+      <div><span style="background:#999; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;"></span>Warmup</div>
+      <div><span style="background:#ff6b6b; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;"></span>Lean (rich mixture)</div>
+      <div><span style="background:#51cf66; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;"></span>λ=1 (ideal)</div>
+      <div><span style="background:#4dabf7; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;"></span>Rich (lean mixture)</div>
+    </div>
+
     <button id="reset-btn">Reset long-term statistics</button>
   </section>
 

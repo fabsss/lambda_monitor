@@ -4,11 +4,21 @@ nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
 .tab-btn.active { font-weight: bold; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
-.stacked-bar { display: flex; height: 1.5rem; width: 100%; margin: 0.5rem 0; overflow: hidden; border: 1px solid #ccc; }
-.bar-warmup { background: gray; }
-.bar-lean { background: red; }
-.bar-lambda1 { background: green; }
-.bar-rich { background: blue; }
+
+.gauge-legend { font-size: 0.85rem; margin: 0.5rem 0; }
+.gauge-legend-item { display: inline-block; margin-right: 1rem; }
+.gauge-legend-color { display: inline-block; width: 1rem; height: 1rem; margin-right: 0.25rem; vertical-align: middle; }
+
+.stats-section { margin: 1rem 0; }
+.stats-section-title { font-weight: bold; font-size: 0.9rem; margin-bottom: 0.25rem; }
+.stacked-bar { display: flex; height: 1.5rem; width: 100%; margin: 0.25rem 0; overflow: hidden; border: 1px solid #ccc; }
+.stacked-bar-label { display: flex; gap: 2rem; font-size: 0.8rem; margin-top: 0.25rem; }
+.stacked-bar-label span { min-width: 60px; }
+
+.bar-warmup { background: #999; }
+.bar-lean { background: #ff6b6b; }
+.bar-lambda1 { background: #51cf66; }
+.bar-rich { background: #4dabf7; }
 
 #gauge { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto; }
 

@@ -19,7 +19,7 @@ void app_main(void)
 {
     printf("lambda_monitor boot\n");
     nvs_store_init();
-    adc_task_start(0);
+    adc_task_start(1);
     wifi_ap_start("lambda-monitor", "lambda1234");
     web_server_start();
     xTaskCreate(rollback_health_check_task, "health_check", 2048, NULL, 2, NULL);

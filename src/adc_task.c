@@ -21,6 +21,7 @@
 
 static adc_oneshot_unit_handle_t s_adc_handle;
 static adc_cali_handle_t s_cali_handle;
+static adc_channel_t s_adc_channel;
 static SemaphoreHandle_t s_mutex;
 
 static si_calibration_t s_cal;
@@ -48,7 +49,7 @@ static void adc_task_fn(void *arg)
     while (1) {
         int raw = 0;
         int raw_mv = 0;
-        esp_err_t read_err = adc_oneshot_read(s_adc_handle, ADC_CHANNEL_0, &raw);
+        esp_err_t read_err = adc_oneshot_read(s_adc_handle, s_adc_channel, &raw);
         if (read_err != ESP_OK) {
             vTaskDelay(pdMS_TO_TICKS(SAMPLE_PERIOD_MS));
             continue;
@@ -98,6 +99,7 @@ static void adc_task_fn(void *arg)
 
 void adc_task_start(int adc1_channel)
 {
+    s_adc_channel = (adc_channel_t)adc1_channel;
     s_mutex = xSemaphoreCreateMutex();
 
     fast_filter_init(&s_fast);
@@ -116,11 +118,11 @@ void adc_task_start(int adc1_channel)
         .bitwidth = ADC_BITWIDTH_DEFAULT,
         .atten = ADC_ATTEN_DB_12,
     };
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc_handle, (adc_channel_t)adc1_channel, &chan_cfg));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(s_adc_handle, s_adc_channel, &chan_cfg));
 
     adc_cali_curve_fitting_config_t cali_cfg = {
         .unit_id = ADC_UNIT_1,
-        .chan = (adc_channel_t)adc1_channel,
+        .chan = s_adc_channel,
         .atten = ADC_ATTEN_DB_12,
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
