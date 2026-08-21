@@ -14,42 +14,42 @@ static si_calibration_t default_cal(void)
 void test_default_calibration_values(void)
 {
     si_calibration_t cal = default_cal();
-    TEST_ASSERT_EQUAL_INT32(0, cal.u_min_mv);
-    TEST_ASSERT_EQUAL_INT32(3000, cal.u_max_mv);
-    TEST_ASSERT_EQUAL_INT32(1500, cal.u_lambda1_mv);
-    TEST_ASSERT_EQUAL_INT32(150, cal.deadband_mv);
+    TEST_ASSERT_EQUAL_INT32(320, cal.u_min_mv);
+    TEST_ASSERT_EQUAL_INT32(2880, cal.u_max_mv);
+    TEST_ASSERT_EQUAL_INT32(1600, cal.u_lambda1_mv);
+    TEST_ASSERT_EQUAL_INT32(160, cal.deadband_mv);
 }
 
 void test_mv_to_index_at_lambda1_is_zero(void)
 {
     si_calibration_t cal = default_cal();
-    TEST_ASSERT_EQUAL_INT32(0, si_mv_to_index(&cal, 1500));
+    TEST_ASSERT_EQUAL_INT32(0, si_mv_to_index(&cal, 1600));
 }
 
 void test_mv_to_index_at_u_min_is_minus_100(void)
 {
     si_calibration_t cal = default_cal();
-    TEST_ASSERT_EQUAL_INT32(-100, si_mv_to_index(&cal, 0));
+    TEST_ASSERT_EQUAL_INT32(-100, si_mv_to_index(&cal, 320));
 }
 
 void test_mv_to_index_at_u_max_is_plus_100(void)
 {
     si_calibration_t cal = default_cal();
-    TEST_ASSERT_EQUAL_INT32(100, si_mv_to_index(&cal, 3000));
+    TEST_ASSERT_EQUAL_INT32(100, si_mv_to_index(&cal, 2880));
 }
 
 void test_mv_to_index_midpoint_lean_side(void)
 {
     si_calibration_t cal = default_cal();
-    /* 750mV is halfway between u_min(0) and u_lambda1(1500) -> index -50 */
-    TEST_ASSERT_EQUAL_INT32(-50, si_mv_to_index(&cal, 750));
+    /* 960mV is halfway between u_min(320) and u_lambda1(1600) -> index -50 */
+    TEST_ASSERT_EQUAL_INT32(-50, si_mv_to_index(&cal, 960));
 }
 
 void test_mv_to_index_midpoint_rich_side(void)
 {
     si_calibration_t cal = default_cal();
-    /* 2250mV is halfway between u_lambda1(1500) and u_max(3000) -> index +50 */
-    TEST_ASSERT_EQUAL_INT32(50, si_mv_to_index(&cal, 2250));
+    /* 2240mV is halfway between u_lambda1(1600) and u_max(2880) -> index +50 */
+    TEST_ASSERT_EQUAL_INT32(50, si_mv_to_index(&cal, 2240));
 }
 
 void test_mv_to_index_clamps_below_u_min(void)

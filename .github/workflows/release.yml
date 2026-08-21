@@ -1,0 +1,51 @@
+name: Release firmware
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # Full history + tags: the embedded firmware version comes from
+          # `git describe --always --tags --dirty` at CMake configure time
+          # (see CLAUDE.md), which needs real tag/commit history to work.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PlatformIO
+        run: pip install -U platformio
+
+      - name: Run native unit tests
+        run: pio test -e test_native
+
+      - name: Build firmware
+        run: pio run -e esp32s3
+
+      - name: Verify embedded version matches tag
+        run: |
+          if ! strings .pio/build/esp32s3/firmware.bin | grep -qx "${GITHUB_REF_NAME}"; then
+            echo "::error::firmware.bin does not embed tag ${GITHUB_REF_NAME} exactly (dirty build or stale configure?)"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            .pio/build/esp32s3/firmware.bin
+            .pio/build/esp32s3/bootloader.bin
+            .pio/build/esp32s3/partitions.bin
+          generate_release_notes: true

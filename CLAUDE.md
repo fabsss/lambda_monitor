@@ -50,3 +50,14 @@ a separate, correctly-working mechanism (it only skips the *compile* step
 when no source/web/header file changed) — it does not protect against
 this CMake-configure staleness, so don't rely on it alone before a
 tagged release.
+
+## CI release builds
+
+`.github/workflows/release.yml` triggers on any `v*.*.*` tag push: runs
+`pio test -e test_native` as a gate, builds `esp32s3` from a fresh
+checkout (always a clean configure, so no staleness risk there), verifies
+the embedded version string matches the tag exactly (fails the build
+otherwise — catches a dirty/mismatched tree before it ships), and attaches
+`firmware.bin` + `bootloader.bin` + `partitions.bin` to a GitHub Release
+via `softprops/action-gh-release`. Pushing a tag (`git push origin vX.Y.Z`)
+is what triggers it — nothing else to do manually.
