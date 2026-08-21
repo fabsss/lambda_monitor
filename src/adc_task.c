@@ -46,9 +46,11 @@ static uint32_t s_dirty_seconds = 0;
  * single once-per-second point sample would be prone to. */
 #define STATS_MS_PER_S 1000u
 static uint32_t s_stats_ms_warmup = 0;
+static uint32_t s_stats_ms_very_lean = 0;
 static uint32_t s_stats_ms_lean = 0;
 static uint32_t s_stats_ms_lambda1 = 0;
 static uint32_t s_stats_ms_rich = 0;
+static uint32_t s_stats_ms_very_rich = 0;
 
 #define AUTOCAL_BUFFER_SIZE 100
 static int32_t s_autocal_buffer[AUTOCAL_BUFFER_SIZE];
@@ -86,6 +88,8 @@ static void adc_task_fn(void *arg)
         } else {
             switch (category) {
                 case SI_CAT_VERY_LEAN:
+                    s_stats_ms_very_lean += SAMPLE_PERIOD_MS;
+                    break;
                 case SI_CAT_LEAN:
                     s_stats_ms_lean += SAMPLE_PERIOD_MS;
                     break;
@@ -93,8 +97,10 @@ static void adc_task_fn(void *arg)
                     s_stats_ms_lambda1 += SAMPLE_PERIOD_MS;
                     break;
                 case SI_CAT_RICH:
-                case SI_CAT_VERY_RICH:
                     s_stats_ms_rich += SAMPLE_PERIOD_MS;
+                    break;
+                case SI_CAT_VERY_RICH:
+                    s_stats_ms_very_rich += SAMPLE_PERIOD_MS;
                     break;
             }
         }
@@ -102,6 +108,11 @@ static void adc_task_fn(void *arg)
             s_stats_ms_warmup -= STATS_MS_PER_S;
             lambda_stats_accumulate(&s_longterm, category, index_fast, 1, true);
             lambda_stats_accumulate(&s_session, category, index_fast, 1, true);
+        }
+        if (s_stats_ms_very_lean >= STATS_MS_PER_S) {
+            s_stats_ms_very_lean -= STATS_MS_PER_S;
+            lambda_stats_accumulate(&s_longterm, SI_CAT_VERY_LEAN, index_fast, 1, false);
+            lambda_stats_accumulate(&s_session, SI_CAT_VERY_LEAN, index_fast, 1, false);
         }
         if (s_stats_ms_lean >= STATS_MS_PER_S) {
             s_stats_ms_lean -= STATS_MS_PER_S;
@@ -117,6 +128,11 @@ static void adc_task_fn(void *arg)
             s_stats_ms_rich -= STATS_MS_PER_S;
             lambda_stats_accumulate(&s_longterm, SI_CAT_RICH, index_fast, 1, false);
             lambda_stats_accumulate(&s_session, SI_CAT_RICH, index_fast, 1, false);
+        }
+        if (s_stats_ms_very_rich >= STATS_MS_PER_S) {
+            s_stats_ms_very_rich -= STATS_MS_PER_S;
+            lambda_stats_accumulate(&s_longterm, SI_CAT_VERY_RICH, index_fast, 1, false);
+            lambda_stats_accumulate(&s_session, SI_CAT_VERY_RICH, index_fast, 1, false);
         }
 
         int64_t now_us = esp_timer_get_time();

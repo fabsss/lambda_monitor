@@ -23,6 +23,8 @@ void lambda_stats_accumulate(lambda_longterm_stats_t *stats, si_category_t categ
 
     switch (category) {
         case SI_CAT_VERY_LEAN:
+            stats->t_very_lean_s += delta_s;
+            break;
         case SI_CAT_LEAN:
             stats->t_lean_s += delta_s;
             break;
@@ -30,8 +32,10 @@ void lambda_stats_accumulate(lambda_longterm_stats_t *stats, si_category_t categ
             stats->t_lambda1_s += delta_s;
             break;
         case SI_CAT_RICH:
-        case SI_CAT_VERY_RICH:
             stats->t_rich_s += delta_s;
+            break;
+        case SI_CAT_VERY_RICH:
+            stats->t_very_rich_s += delta_s;
             break;
         default:
             break;

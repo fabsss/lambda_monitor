@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include "signal_interpreter.h"
 
-#define LAMBDA_STATS_VERSION 2
+#define LAMBDA_STATS_VERSION 3
 
 /**
  * @brief Versioned, checksummed long-term statistics struct (spec §4.4).
@@ -17,9 +17,11 @@
 typedef struct __attribute__((packed)) {
     uint16_t struct_version;
     uint32_t t_warmup_s;
+    uint32_t t_very_lean_s;
     uint32_t t_lean_s;
     uint32_t t_lambda1_s;
     uint32_t t_rich_s;
+    uint32_t t_very_rich_s;
     int16_t  index_min;
     int16_t  index_max;
     uint32_t total_runtime_s;
@@ -46,12 +48,9 @@ void lambda_stats_reset(lambda_longterm_stats_t *stats);
  * While in_warmup is true, delta_s is added to t_warmup_s only, and
  * index_min/index_max are NOT updated (spec §3.2: warmup samples are
  * excluded from min/max tracking). Otherwise, delta_s is added to the
- * bucket matching category (lean/lambda1/rich) and index_min/index_max
- * are updated. total_runtime_s always accumulates delta_s regardless
- * of warmup state.
- *
- * Note: SI_CAT_VERY_LEAN and SI_CAT_LEAN both accumulate into t_lean_s;
- * SI_CAT_RICH and SI_CAT_VERY_RICH both accumulate into t_rich_s.
+ * bucket matching category (very_lean/lean/lambda1/rich/very_rich) and
+ * index_min/index_max are updated. total_runtime_s always accumulates
+ * delta_s regardless of warmup state.
  *
  * @param stats    Pointer to stats struct to update.
  * @param category Current mixture category classification.

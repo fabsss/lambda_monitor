@@ -80,9 +80,11 @@ static esp_err_t stats_get_handler(httpd_req_t *req)
 
     cJSON *root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "t_warmup_s", longterm.t_warmup_s);
+    cJSON_AddNumberToObject(root, "t_very_lean_s", longterm.t_very_lean_s);
     cJSON_AddNumberToObject(root, "t_lean_s", longterm.t_lean_s);
     cJSON_AddNumberToObject(root, "t_lambda1_s", longterm.t_lambda1_s);
     cJSON_AddNumberToObject(root, "t_rich_s", longterm.t_rich_s);
+    cJSON_AddNumberToObject(root, "t_very_rich_s", longterm.t_very_rich_s);
     cJSON_AddNumberToObject(root, "index_min", longterm.index_min);
     cJSON_AddNumberToObject(root, "index_max", longterm.index_max);
     cJSON_AddNumberToObject(root, "avg2s_min", longterm.avg2s_min);
@@ -91,9 +93,11 @@ static esp_err_t stats_get_handler(httpd_req_t *req)
 
     cJSON *session_obj = cJSON_CreateObject();
     cJSON_AddNumberToObject(session_obj, "t_warmup_s", session.t_warmup_s);
+    cJSON_AddNumberToObject(session_obj, "t_very_lean_s", session.t_very_lean_s);
     cJSON_AddNumberToObject(session_obj, "t_lean_s", session.t_lean_s);
     cJSON_AddNumberToObject(session_obj, "t_lambda1_s", session.t_lambda1_s);
     cJSON_AddNumberToObject(session_obj, "t_rich_s", session.t_rich_s);
+    cJSON_AddNumberToObject(session_obj, "t_very_rich_s", session.t_very_rich_s);
     cJSON_AddNumberToObject(session_obj, "index_min", session.index_min);
     cJSON_AddNumberToObject(session_obj, "index_max", session.index_max);
     cJSON_AddNumberToObject(session_obj, "avg2s_min", session.avg2s_min);

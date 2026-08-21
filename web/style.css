@@ -16,9 +16,11 @@ nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
 .stacked-bar-label span { min-width: 60px; }
 
 .bar-warmup { background: #999; }
+.bar-very-lean { background: #c92a2a; }
 .bar-lean { background: #ff6b6b; }
 .bar-lambda1 { background: #51cf66; }
 .bar-rich { background: #4dabf7; }
+.bar-very-rich { background: #1864ab; }
 
 #gauge { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto; }
 

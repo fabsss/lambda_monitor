@@ -23,17 +23,19 @@ function updateGauge(indexFast, indexSlow) {
   needleSlow.setAttribute('transform', `rotate(${indexToAngle(indexSlow)} 100 110)`);
 }
 
-function renderStackedBar(elId, tWarmup, tLean, tLambda1, tRich) {
-  const total = tWarmup + tLean + tLambda1 + tRich;
+function renderStackedBar(elId, tWarmup, tVeryLean, tLean, tLambda1, tRich, tVeryRich) {
+  const total = tWarmup + tVeryLean + tLean + tLambda1 + tRich + tVeryRich;
   const el = document.getElementById(elId);
   el.innerHTML = '';
   if (total === 0) return;
 
   const segments = [
     ['bar-warmup', tWarmup, 'Warmup'],
+    ['bar-very-lean', tVeryLean, 'Very Lean'],
     ['bar-lean', tLean, 'Lean'],
     ['bar-lambda1', tLambda1, 'λ=1'],
     ['bar-rich', tRich, 'Rich'],
+    ['bar-very-rich', tVeryRich, 'Very Rich'],
   ];
 
   for (const [cls, seconds, label] of segments) {
@@ -48,12 +50,9 @@ function renderStackedBar(elId, tWarmup, tLean, tLambda1, tRich) {
 
   const labelsEl = document.getElementById(elId.replace('bar', 'labels'));
   if (labelsEl) {
-    labelsEl.innerHTML = `
-      <span>Warmup: ${tWarmup}s (${total ? (tWarmup/total*100).toFixed(1) : 0}%)</span>
-      <span>Lean: ${tLean}s (${total ? (tLean/total*100).toFixed(1) : 0}%)</span>
-      <span>λ=1: ${tLambda1}s (${total ? (tLambda1/total*100).toFixed(1) : 0}%)</span>
-      <span>Rich: ${tRich}s (${total ? (tRich/total*100).toFixed(1) : 0}%)</span>
-    `;
+    labelsEl.innerHTML = segments.map(([, seconds, label]) =>
+      `<span>${label}: ${seconds}s (${total ? (seconds/total*100).toFixed(1) : 0}%)</span>`
+    ).join('');
   }
 }
 
@@ -113,8 +112,8 @@ function formatAvg2sRange(min, max) {
 async function refreshStats() {
   const res = await fetch('/api/stats');
   const data = await res.json();
-  renderStackedBar('session-bar', data.session.t_warmup_s, data.session.t_lean_s, data.session.t_lambda1_s, data.session.t_rich_s);
-  renderStackedBar('longterm-bar', data.t_warmup_s, data.t_lean_s, data.t_lambda1_s, data.t_rich_s);
+  renderStackedBar('session-bar', data.session.t_warmup_s, data.session.t_very_lean_s, data.session.t_lean_s, data.session.t_lambda1_s, data.session.t_rich_s, data.session.t_very_rich_s);
+  renderStackedBar('longterm-bar', data.t_warmup_s, data.t_very_lean_s, data.t_lean_s, data.t_lambda1_s, data.t_rich_s, data.t_very_rich_s);
   document.getElementById('session-avg2s-range').textContent = formatAvg2sRange(data.session.avg2s_min, data.session.avg2s_max);
   document.getElementById('longterm-avg2s-range').textContent = formatAvg2sRange(data.avg2s_min, data.avg2s_max);
 }

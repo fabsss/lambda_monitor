@@ -11,9 +11,11 @@ void test_reset_sets_version_and_zeroes_buckets(void)
 
     TEST_ASSERT_EQUAL_UINT16(LAMBDA_STATS_VERSION, stats.struct_version);
     TEST_ASSERT_EQUAL_UINT32(0, stats.t_warmup_s);
+    TEST_ASSERT_EQUAL_UINT32(0, stats.t_very_lean_s);
     TEST_ASSERT_EQUAL_UINT32(0, stats.t_lean_s);
     TEST_ASSERT_EQUAL_UINT32(0, stats.t_lambda1_s);
     TEST_ASSERT_EQUAL_UINT32(0, stats.t_rich_s);
+    TEST_ASSERT_EQUAL_UINT32(0, stats.t_very_rich_s);
     TEST_ASSERT_EQUAL_UINT32(0, stats.total_runtime_s);
     TEST_ASSERT_EQUAL_INT16(100, stats.avg2s_min);
     TEST_ASSERT_EQUAL_INT16(-100, stats.avg2s_max);
@@ -42,9 +44,11 @@ void test_accumulate_operating_adds_to_category_bucket(void)
     lambda_stats_accumulate(&stats, SI_CAT_RICH, 30, 4, false);
     lambda_stats_accumulate(&stats, SI_CAT_VERY_RICH, 80, 2, false);
 
-    TEST_ASSERT_EQUAL_UINT32(8, stats.t_lean_s);   /* very_lean + lean */
+    TEST_ASSERT_EQUAL_UINT32(5, stats.t_very_lean_s);
+    TEST_ASSERT_EQUAL_UINT32(3, stats.t_lean_s);
     TEST_ASSERT_EQUAL_UINT32(7, stats.t_lambda1_s);
-    TEST_ASSERT_EQUAL_UINT32(6, stats.t_rich_s);   /* rich + very_rich */
+    TEST_ASSERT_EQUAL_UINT32(4, stats.t_rich_s);
+    TEST_ASSERT_EQUAL_UINT32(2, stats.t_very_rich_s);
     TEST_ASSERT_EQUAL_UINT32(21, stats.total_runtime_s);
 }
 
