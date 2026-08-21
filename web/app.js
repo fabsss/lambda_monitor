@@ -225,13 +225,8 @@ const uplotInstance = new uPlot({
     draw: [
       (u) => {
         if (!chartConfig) return;
-        const { u_min_mv, u_max_mv, u_lambda1_mv, deadband_mv } = chartConfig;
+        const { u_lambda1_mv, deadband_mv } = chartConfig;
         const yScale = u.scales.y;
-
-        const rich_upper = u_lambda1_mv + deadband_mv;
-        const rich_lower = u_lambda1_mv - deadband_mv;
-        const lean_upper = u_max_mv;
-        const lean_lower = u_lambda1_mv + deadband_mv;
 
         const ctx = u.ctx;
         const plotTop = u.bbox.top;
@@ -240,22 +235,27 @@ const uplotInstance = new uPlot({
 
         const yValToPixel = (yVal) => plotBottom - ((yVal - yScale.min) / (yScale.max - yScale.min)) * plotHeight;
 
-        const richBottom = yValToPixel(rich_lower);
-        const richTop = yValToPixel(rich_upper);
-        const lambda1Center = yValToPixel(u_lambda1_mv);
-        const leanBottom = yValToPixel(lean_lower);
-        const leanTop = yValToPixel(lean_upper);
-        const topBound = yValToPixel(3300);
+        const richLower = u_lambda1_mv - deadband_mv;
+        const richUpper = u_lambda1_mv + deadband_mv;
+        const leanLower = u_lambda1_mv + deadband_mv;
+        const leanUpper = yScale.max;
 
-        ctx.fillStyle = 'rgba(77, 171, 247, 0.15)';
-        ctx.fillRect(u.bbox.left, richBottom, u.bbox.width, richTop - richBottom);
+        const richY1 = yValToPixel(richUpper);
+        const richY2 = yValToPixel(richLower);
+        const leanY1 = yValToPixel(leanUpper);
+        const leanY2 = yValToPixel(leanLower);
+        const lambda1Y = yValToPixel(u_lambda1_mv);
+        const lambda1DeadbandY1 = yValToPixel(u_lambda1_mv + deadband_mv);
+        const lambda1DeadbandY2 = yValToPixel(u_lambda1_mv - deadband_mv);
 
-        ctx.fillStyle = 'rgba(81, 207, 102, 0.15)';
-        const lambda1Height = (deadband_mv / (yScale.max - yScale.min)) * plotHeight;
-        ctx.fillRect(u.bbox.left, lambda1Center - lambda1Height / 2, u.bbox.width, lambda1Height);
+        ctx.fillStyle = 'rgba(77, 171, 247, 0.2)';
+        ctx.fillRect(u.bbox.left, richY1, u.bbox.width, richY2 - richY1);
 
-        ctx.fillStyle = 'rgba(255, 107, 107, 0.15)';
-        ctx.fillRect(u.bbox.left, leanBottom, u.bbox.width, leanTop - leanBottom);
+        ctx.fillStyle = 'rgba(81, 207, 102, 0.2)';
+        ctx.fillRect(u.bbox.left, lambda1DeadbandY1, u.bbox.width, lambda1DeadbandY2 - lambda1DeadbandY1);
+
+        ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
+        ctx.fillRect(u.bbox.left, leanY1, u.bbox.width, leanY2 - leanY1);
       }
     ]
   }
