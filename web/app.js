@@ -201,9 +201,10 @@ setInterval(updateAutocalStatus, 500);
 
 let chartWindowS = 60;
 let frozen = false;
+let chartConfig = null;
 
 const chartContainer = document.getElementById('chart');
-const chartData = [[], [], [], []];
+const chartData = [[], []];
 
 const uplotInstance = new uPlot({
   width: chartContainer.clientWidth,
@@ -211,8 +212,6 @@ const uplotInstance = new uPlot({
   series: [
     { label: 'Time (s)' },
     { label: 'Voltage (mV)', stroke: '#000', width: 2 },
-    { label: 'Lean zone', stroke: '#ff6b6b', fill: 'rgba(255,107,107,0.1)', width: 0 },
-    { label: 'Rich zone', stroke: '#4dabf7', fill: 'rgba(77,171,247,0.1)', width: 0 },
   ],
   scales: {
     x: { time: false },
@@ -222,6 +221,44 @@ const uplotInstance = new uPlot({
     { label: 'Time since start (s)' },
     { label: 'Voltage (mV)' },
   ],
+  hooks: {
+    draw: [
+      (u) => {
+        if (!chartConfig) return;
+        const { u_min_mv, u_max_mv, u_lambda1_mv, deadband_mv } = chartConfig;
+        const yScale = u.scales.y;
+
+        const rich_upper = u_lambda1_mv + deadband_mv;
+        const rich_lower = u_lambda1_mv - deadband_mv;
+        const lean_upper = u_max_mv;
+        const lean_lower = u_lambda1_mv + deadband_mv;
+
+        const ctx = u.ctx;
+        const plotTop = u.bbox.top;
+        const plotBottom = u.bbox.top + u.bbox.height;
+        const plotHeight = u.bbox.height;
+
+        const yValToPixel = (yVal) => plotBottom - ((yVal - yScale.min) / (yScale.max - yScale.min)) * plotHeight;
+
+        const richBottom = yValToPixel(rich_lower);
+        const richTop = yValToPixel(rich_upper);
+        const lambda1Center = yValToPixel(u_lambda1_mv);
+        const leanBottom = yValToPixel(lean_lower);
+        const leanTop = yValToPixel(lean_upper);
+        const topBound = yValToPixel(3300);
+
+        ctx.fillStyle = 'rgba(77, 171, 247, 0.15)';
+        ctx.fillRect(u.bbox.left, richBottom, u.bbox.width, richTop - richBottom);
+
+        ctx.fillStyle = 'rgba(81, 207, 102, 0.15)';
+        const lambda1Height = (deadband_mv / (yScale.max - yScale.min)) * plotHeight;
+        ctx.fillRect(u.bbox.left, lambda1Center - lambda1Height / 2, u.bbox.width, lambda1Height);
+
+        ctx.fillStyle = 'rgba(255, 107, 107, 0.15)';
+        ctx.fillRect(u.bbox.left, leanBottom, u.bbox.width, leanTop - leanBottom);
+      }
+    ]
+  }
 }, chartData, chartContainer);
 
 window.resizeChartToContainer = () => {
@@ -236,14 +273,13 @@ async function refreshChart() {
     const data = await res.json();
     const configRes = await fetch('/api/config');
     const config = await configRes.json();
+    chartConfig = config;
 
     const now = data.timestamps_s.length ? data.timestamps_s[data.timestamps_s.length - 1] : 0;
     const cutoff = now - chartWindowS;
 
     const xs = [];
     const ys = [];
-    const leanZone = [];
-    const richZone = [];
 
     for (let i = 0; i < data.timestamps_s.length; i++) {
       const ts = data.timestamps_s[i];
@@ -252,11 +288,9 @@ async function refreshChart() {
         const mv = 320 + (idx / 100) * (2880 - 320);
         xs.push(ts);
         ys.push(mv);
-        leanZone.push(config.u_lambda1_mv + config.deadband_mv);
-        richZone.push(config.u_lambda1_mv - config.deadband_mv);
       }
     }
-    uplotInstance.setData([xs, ys, leanZone, richZone]);
+    uplotInstance.setData([xs, ys]);
   } catch (e) {
     console.error('chart refresh failed:', e);
   }
