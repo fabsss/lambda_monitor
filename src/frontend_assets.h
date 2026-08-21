@@ -1,4 +1,4 @@
-// Hash: c1058b57e111fc8e6ff6d90c5c269c3c
+// Hash: 2395e8c98cde42c3b0524362b3754b97
 #ifndef FRONTEND_ASSETS_H
 #define FRONTEND_ASSETS_H
 
@@ -49,9 +49,9 @@ static const char INDEX_HTML[] =
     "\n"
     "    <div class=\"stats-legend\" style=\"font-size: 0.8rem; margin-top: 0.5rem;\">\n"
     "      <div><span style=\"background:#999; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Warmup</div>\n"
-    "      <div><span style=\"background:#ff6b6b; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Lean (rich mixture)</div>\n"
+    "      <div><span style=\"background:#4dabf7; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Lean Mixture</div>\n"
     "      <div><span style=\"background:#51cf66; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>λ=1 (ideal)</div>\n"
-    "      <div><span style=\"background:#4dabf7; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Rich (lean mixture)</div>\n"
+    "      <div><span style=\"background:#ff6b6b; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Rich Mixture</div>\n"
     "    </div>\n"
     "\n"
     "    <button id=\"reset-btn\">Reset long-term statistics</button>\n"
