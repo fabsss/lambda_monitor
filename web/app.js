@@ -248,13 +248,13 @@ const uplotInstance = new uPlot({
         const lambda1DeadbandY1 = yValToPixel(u_lambda1_mv + deadband_mv);
         const lambda1DeadbandY2 = yValToPixel(u_lambda1_mv - deadband_mv);
 
-        ctx.fillStyle = 'rgba(77, 171, 247, 0.2)';
+        ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
         ctx.fillRect(u.bbox.left, richY1, u.bbox.width, richY2 - richY1);
 
         ctx.fillStyle = 'rgba(81, 207, 102, 0.2)';
         ctx.fillRect(u.bbox.left, lambda1DeadbandY1, u.bbox.width, lambda1DeadbandY2 - lambda1DeadbandY1);
 
-        ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
+        ctx.fillStyle = 'rgba(77, 171, 247, 0.2)';
         ctx.fillRect(u.bbox.left, leanY1, u.bbox.width, leanY2 - leanY1);
       }
     ]

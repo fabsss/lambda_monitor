@@ -1,4 +1,4 @@
-// Hash: 2395e8c98cde42c3b0524362b3754b97
+// Hash: d40f6bf15c80a8a9aee8ef9de4742792
 #ifndef FRONTEND_ASSETS_H
 #define FRONTEND_ASSETS_H
 
@@ -49,9 +49,9 @@ static const char INDEX_HTML[] =
     "\n"
     "    <div class=\"stats-legend\" style=\"font-size: 0.8rem; margin-top: 0.5rem;\">\n"
     "      <div><span style=\"background:#999; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Warmup</div>\n"
-    "      <div><span style=\"background:#4dabf7; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Lean Mixture</div>\n"
+    "      <div><span style=\"background:#ff6b6b; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Lean Mixture</div>\n"
     "      <div><span style=\"background:#51cf66; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>λ=1 (ideal)</div>\n"
-    "      <div><span style=\"background:#ff6b6b; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Rich Mixture</div>\n"
+    "      <div><span style=\"background:#4dabf7; display:inline-block; width:0.7rem; height:0.7rem; margin-right:0.3rem;\"></span>Rich Mixture</div>\n"
     "    </div>\n"
     "\n"
     "    <button id=\"reset-btn\">Reset long-term statistics</button>\n"
@@ -388,13 +388,13 @@ static const char APP_JS[] =
     "        const lambda1DeadbandY1 = yValToPixel(u_lambda1_mv + deadband_mv);\n"
     "        const lambda1DeadbandY2 = yValToPixel(u_lambda1_mv - deadband_mv);\n"
     "\n"
-    "        ctx.fillStyle = 'rgba(77, 171, 247, 0.2)';\n"
+    "        ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';\n"
     "        ctx.fillRect(u.bbox.left, richY1, u.bbox.width, richY2 - richY1);\n"
     "\n"
     "        ctx.fillStyle = 'rgba(81, 207, 102, 0.2)';\n"
     "        ctx.fillRect(u.bbox.left, lambda1DeadbandY1, u.bbox.width, lambda1DeadbandY2 - lambda1DeadbandY1);\n"
     "\n"
-    "        ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';\n"
+    "        ctx.fillStyle = 'rgba(77, 171, 247, 0.2)';\n"
     "        ctx.fillRect(u.bbox.left, leanY1, u.bbox.width, leanY2 - leanY1);\n"
     "      }\n"
     "    ]\n"
