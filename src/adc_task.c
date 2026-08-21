@@ -1,4 +1,5 @@
 #include "adc_task.h"
+#include "config.h"
 #include "signal_interpreter.h"
 #include "mix_filter.h"
 #include "warmup_fsm.h"
@@ -27,6 +28,7 @@ static SemaphoreHandle_t s_mutex;
 static si_calibration_t s_cal;
 static fast_filter_t s_fast;
 static slow_filter_t s_slow;
+static slow_filter_t s_avg2s;
 static warmup_fsm_t s_warmup;
 static switch_detector_t s_switch;
 static ring_buffer_t s_ring;
@@ -35,6 +37,18 @@ static lambda_longterm_stats_t s_session;
 static adc_snapshot_t s_snapshot;
 static uint32_t s_dirty_seconds = 0;
 #define STATS_COMMIT_INTERVAL_S 30
+
+/* Fine-grained (per-sample) dwell-time accounting for the lean/lambda1/rich/
+ * warmup buckets. Each 10ms tick credits whichever bucket is active *then*,
+ * accumulated here in milliseconds; once a bucket crosses a full second it
+ * is committed to the persisted stats via lambda_stats_accumulate(delta_s=1).
+ * This avoids aliasing against the sensor's switching frequency, which a
+ * single once-per-second point sample would be prone to. */
+#define STATS_MS_PER_S 1000u
+static uint32_t s_stats_ms_warmup = 0;
+static uint32_t s_stats_ms_lean = 0;
+static uint32_t s_stats_ms_lambda1 = 0;
+static uint32_t s_stats_ms_rich = 0;
 
 #define AUTOCAL_BUFFER_SIZE 100
 static int32_t s_autocal_buffer[AUTOCAL_BUFFER_SIZE];
@@ -65,6 +79,46 @@ static void adc_task_fn(void *arg)
             s_autocal_buffer[s_autocal_count++] = raw_mv;
         }
         s_snapshot.raw_mv = raw_mv;
+
+        bool in_warmup_now = s_warmup.state == WARMUP_STATE_WARMUP;
+        if (in_warmup_now) {
+            s_stats_ms_warmup += SAMPLE_PERIOD_MS;
+        } else {
+            switch (category) {
+                case SI_CAT_VERY_LEAN:
+                case SI_CAT_LEAN:
+                    s_stats_ms_lean += SAMPLE_PERIOD_MS;
+                    break;
+                case SI_CAT_LAMBDA1:
+                    s_stats_ms_lambda1 += SAMPLE_PERIOD_MS;
+                    break;
+                case SI_CAT_RICH:
+                case SI_CAT_VERY_RICH:
+                    s_stats_ms_rich += SAMPLE_PERIOD_MS;
+                    break;
+            }
+        }
+        if (s_stats_ms_warmup >= STATS_MS_PER_S) {
+            s_stats_ms_warmup -= STATS_MS_PER_S;
+            lambda_stats_accumulate(&s_longterm, category, index_fast, 1, true);
+            lambda_stats_accumulate(&s_session, category, index_fast, 1, true);
+        }
+        if (s_stats_ms_lean >= STATS_MS_PER_S) {
+            s_stats_ms_lean -= STATS_MS_PER_S;
+            lambda_stats_accumulate(&s_longterm, SI_CAT_LEAN, index_fast, 1, false);
+            lambda_stats_accumulate(&s_session, SI_CAT_LEAN, index_fast, 1, false);
+        }
+        if (s_stats_ms_lambda1 >= STATS_MS_PER_S) {
+            s_stats_ms_lambda1 -= STATS_MS_PER_S;
+            lambda_stats_accumulate(&s_longterm, SI_CAT_LAMBDA1, index_fast, 1, false);
+            lambda_stats_accumulate(&s_session, SI_CAT_LAMBDA1, index_fast, 1, false);
+        }
+        if (s_stats_ms_rich >= STATS_MS_PER_S) {
+            s_stats_ms_rich -= STATS_MS_PER_S;
+            lambda_stats_accumulate(&s_longterm, SI_CAT_RICH, index_fast, 1, false);
+            lambda_stats_accumulate(&s_session, SI_CAT_RICH, index_fast, 1, false);
+        }
+
         int64_t now_us = esp_timer_get_time();
         if (now_us - last_second_us >= 1000000) {
             uint32_t delta_s = (uint32_t)((now_us - last_second_us) / 1000000);
@@ -73,10 +127,8 @@ static void adc_task_fn(void *arg)
             bool edge = switch_detector_update(&s_switch, index_fast, delta_s);
             warmup_fsm_tick(&s_warmup, delta_s, edge);
             slow_filter_push(&s_slow, index_fast, delta_s);
+            slow_filter_push(&s_avg2s, index_fast, delta_s);
             ring_buffer_push(&s_ring, index_fast, (uint32_t)(now_us / 1000000));
-            bool in_warmup = s_warmup.state == WARMUP_STATE_WARMUP;
-            lambda_stats_accumulate(&s_longterm, category, index_fast, delta_s, in_warmup);
-            lambda_stats_accumulate(&s_session, category, index_fast, delta_s, in_warmup);
 
             s_dirty_seconds += delta_s;
             if (s_dirty_seconds >= STATS_COMMIT_INTERVAL_S) {
@@ -84,8 +136,14 @@ static void adc_task_fn(void *arg)
                 s_dirty_seconds = 0;
             }
 
+            bool in_warmup_1hz = s_warmup.state == WARMUP_STATE_WARMUP;
+            int32_t avg_2s = slow_filter_average(&s_avg2s);
+            lambda_stats_track_avg2s(&s_longterm, avg_2s, in_warmup_1hz);
+            lambda_stats_track_avg2s(&s_session, avg_2s, in_warmup_1hz);
+
             s_snapshot.index_fast = index_fast;
             s_snapshot.index_slow_avg = slow_filter_average(&s_slow);
+            s_snapshot.index_avg_2s = avg_2s;
             s_snapshot.category = category;
             s_snapshot.warmup_state = s_warmup.state;
             s_snapshot.switches_per_min = s_switch.switches_per_min;
@@ -104,6 +162,7 @@ void adc_task_start(int adc1_channel)
 
     fast_filter_init(&s_fast);
     slow_filter_init(&s_slow, 5);
+    slow_filter_init(&s_avg2s, AVG_WINDOW_S);
     warmup_fsm_init(&s_warmup, WARMUP_TIMEOUT_S);
     switch_detector_init(&s_switch);
     ring_buffer_init(&s_ring);

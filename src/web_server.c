@@ -1,4 +1,5 @@
 #include "web_server.h"
+#include "config.h"
 #include "frontend_assets.h"
 #include "adc_task.h"
 #include "nvs_store.h"
@@ -9,18 +10,13 @@
 
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_app_desc.h"
 #include "cJSON.h"
 #include <string.h>
 #include <stdbool.h>
 
 static const char *TAG = "web_server";
 static httpd_handle_t s_server = NULL;
-
-/* ADC1 attenuated full-scale range (ADC_ATTEN_DB_12, see adc_task.c).
- * Bosch step lambda sensor with 3.2× op-amp gain operates in ~320–2880 mV range,
- * but we allow the full 0–3300 mV range for flexibility (future sensors, debug). */
-#define ADC_MV_MIN 0
-#define ADC_MV_MAX 3300
 
 static bool calibration_is_valid(const si_calibration_t *cal)
 {
@@ -89,6 +85,8 @@ static esp_err_t stats_get_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "t_rich_s", longterm.t_rich_s);
     cJSON_AddNumberToObject(root, "index_min", longterm.index_min);
     cJSON_AddNumberToObject(root, "index_max", longterm.index_max);
+    cJSON_AddNumberToObject(root, "avg2s_min", longterm.avg2s_min);
+    cJSON_AddNumberToObject(root, "avg2s_max", longterm.avg2s_max);
     cJSON_AddNumberToObject(root, "total_runtime_s", longterm.total_runtime_s);
 
     cJSON *session_obj = cJSON_CreateObject();
@@ -98,6 +96,8 @@ static esp_err_t stats_get_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(session_obj, "t_rich_s", session.t_rich_s);
     cJSON_AddNumberToObject(session_obj, "index_min", session.index_min);
     cJSON_AddNumberToObject(session_obj, "index_max", session.index_max);
+    cJSON_AddNumberToObject(session_obj, "avg2s_min", session.avg2s_min);
+    cJSON_AddNumberToObject(session_obj, "avg2s_max", session.avg2s_max);
     cJSON_AddNumberToObject(session_obj, "total_runtime_s", session.total_runtime_s);
     cJSON_AddItemToObject(root, "session", session_obj);
 
@@ -174,6 +174,23 @@ static esp_err_t config_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t version_get_handler(httpd_req_t *req)
+{
+    const esp_app_desc_t *desc = esp_app_get_description();
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "fw_version", desc->version);
+    cJSON_AddStringToObject(root, "build_date", desc->date);
+    cJSON_AddStringToObject(root, "build_time", desc->time);
+
+    char *json = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    cJSON_free(json);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 static esp_err_t uplot_js_get_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/javascript");
@@ -224,6 +241,7 @@ static esp_err_t snapshot_get_handler(httpd_req_t *req)
     cJSON *root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "index_fast", snap.index_fast);
     cJSON_AddNumberToObject(root, "index_slow_avg", snap.index_slow_avg);
+    cJSON_AddNumberToObject(root, "index_avg_2s", snap.index_avg_2s);
     cJSON_AddNumberToObject(root, "category", snap.category);
     cJSON_AddNumberToObject(root, "warmup_state", snap.warmup_state);
     cJSON_AddNumberToObject(root, "switches_per_min", snap.switches_per_min);
@@ -349,6 +367,7 @@ void web_server_start(void)
         { .uri = "/uplot.min.css", .method = HTTP_GET, .handler = uplot_css_get_handler },
         { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },
         { .uri = "/api/ota", .method = HTTP_POST, .handler = ota_post_handler },
+        { .uri = "/api/version", .method = HTTP_GET, .handler = version_get_handler },
         { .uri = "/generate_204", .method = HTTP_GET, .handler = connectivity_check_handler },
         { .uri = "/*", .method = HTTP_GET, .handler = captive_portal_handler },
     };

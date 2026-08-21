@@ -65,6 +65,9 @@ async function updateLiveData() {
     const data = await res.json();
     updateGauge(data.index_fast, data.index_slow_avg);
     document.getElementById('switch-freq').textContent = data.switches_per_min;
+    const avg2s = data.index_avg_2s;
+    const avg2sLabel = avg2s > 0 ? `+${avg2s} (rich bias)` : avg2s < 0 ? `${avg2s} (lean bias)` : '0 (centered)';
+    document.getElementById('avg-2s').textContent = avg2sLabel;
     document.getElementById('status-text').textContent =
       data.warmup_state === 0 ? 'Sensor warming up…' : 'Sensor ready';
     document.getElementById('wizard-live-mv').textContent = data.raw_mv + ' mV';
@@ -90,11 +93,30 @@ async function refreshConfig() {
 }
 refreshConfig();
 
+async function refreshVersion() {
+  try {
+    const res = await fetch('/api/version');
+    const data = await res.json();
+    document.getElementById('fw-version').textContent = data.fw_version;
+    document.getElementById('fw-build').textContent = `${data.build_date} ${data.build_time}`;
+  } catch (e) {
+    console.error('version fetch failed:', e);
+  }
+}
+refreshVersion();
+
+function formatAvg2sRange(min, max) {
+  if (min > max) return 'n/a'; /* no non-warmup samples recorded yet */
+  return `${min} … ${max}`;
+}
+
 async function refreshStats() {
   const res = await fetch('/api/stats');
   const data = await res.json();
   renderStackedBar('session-bar', data.session.t_warmup_s, data.session.t_lean_s, data.session.t_lambda1_s, data.session.t_rich_s);
   renderStackedBar('longterm-bar', data.t_warmup_s, data.t_lean_s, data.t_lambda1_s, data.t_rich_s);
+  document.getElementById('session-avg2s-range').textContent = formatAvg2sRange(data.session.avg2s_min, data.session.avg2s_max);
+  document.getElementById('longterm-avg2s-range').textContent = formatAvg2sRange(data.avg2s_min, data.avg2s_max);
 }
 setInterval(refreshStats, 2000);
 refreshStats();

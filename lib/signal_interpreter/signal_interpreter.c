@@ -1,18 +1,19 @@
 #include "signal_interpreter.h"
+#include "config.h"
 
 /**
  * @brief Initialize calibration with default values.
  */
 void si_default_calibration(si_calibration_t *cal)
 {
-    cal->u_min_mv = 320;      /* Bosch step lambda: 0.1V × 3.2 gain = 320 mV (lean) */
-    cal->u_max_mv = 2880;     /* Bosch step lambda: 0.9V × 3.2 gain = 2880 mV (rich) */
-    cal->u_lambda1_mv = 1600; /* Midpoint of 320–2880 mV range (stoichiometric) */
-    cal->deadband_mv = 160;   /* ~5.6% of range for hysteresis tolerance */
-    cal->thresh_very_lean = -60;
-    cal->thresh_lean = -20;
-    cal->thresh_rich = 20;
-    cal->thresh_very_rich = 60;
+    cal->u_min_mv = CALIB_DEFAULT_U_MIN_MV;
+    cal->u_max_mv = CALIB_DEFAULT_U_MAX_MV;
+    cal->u_lambda1_mv = CALIB_DEFAULT_U_LAMBDA1_MV;
+    cal->deadband_mv = CALIB_DEFAULT_DEADBAND_MV;
+    cal->thresh_very_lean = CALIB_DEFAULT_THRESH_VERY_LEAN;
+    cal->thresh_lean = CALIB_DEFAULT_THRESH_LEAN;
+    cal->thresh_rich = CALIB_DEFAULT_THRESH_RICH;
+    cal->thresh_very_rich = CALIB_DEFAULT_THRESH_VERY_RICH;
 }
 
 /**

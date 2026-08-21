@@ -15,6 +15,8 @@ void test_reset_sets_version_and_zeroes_buckets(void)
     TEST_ASSERT_EQUAL_UINT32(0, stats.t_lambda1_s);
     TEST_ASSERT_EQUAL_UINT32(0, stats.t_rich_s);
     TEST_ASSERT_EQUAL_UINT32(0, stats.total_runtime_s);
+    TEST_ASSERT_EQUAL_INT16(100, stats.avg2s_min);
+    TEST_ASSERT_EQUAL_INT16(-100, stats.avg2s_max);
 }
 
 void test_accumulate_warmup_only_adds_to_warmup_bucket(void)
@@ -72,6 +74,32 @@ void test_operating_updates_index_min_max(void)
     TEST_ASSERT_EQUAL_INT16(75, stats.index_max);
 }
 
+void test_track_avg2s_updates_min_max(void)
+{
+    lambda_longterm_stats_t stats;
+    lambda_stats_reset(&stats);
+
+    lambda_stats_track_avg2s(&stats, 10, false);
+    lambda_stats_track_avg2s(&stats, -35, false);
+    lambda_stats_track_avg2s(&stats, 60, false);
+
+    TEST_ASSERT_EQUAL_INT16(-35, stats.avg2s_min);
+    TEST_ASSERT_EQUAL_INT16(60, stats.avg2s_max);
+}
+
+void test_track_avg2s_excludes_warmup(void)
+{
+    lambda_longterm_stats_t stats;
+    lambda_stats_reset(&stats);
+
+    lambda_stats_track_avg2s(&stats, -100, true);
+    lambda_stats_track_avg2s(&stats, 100, true);
+
+    /* avg2s_min/avg2s_max should remain at their untouched sentinel values */
+    TEST_ASSERT_EQUAL_INT16(100, stats.avg2s_min);
+    TEST_ASSERT_EQUAL_INT16(-100, stats.avg2s_max);
+}
+
 void test_finalize_and_validate_round_trip(void)
 {
     lambda_longterm_stats_t stats;
@@ -105,6 +133,8 @@ int main(void)
     RUN_TEST(test_accumulate_operating_adds_to_category_bucket);
     RUN_TEST(test_warmup_excludes_index_min_max_tracking);
     RUN_TEST(test_operating_updates_index_min_max);
+    RUN_TEST(test_track_avg2s_updates_min_max);
+    RUN_TEST(test_track_avg2s_excludes_warmup);
     RUN_TEST(test_finalize_and_validate_round_trip);
     RUN_TEST(test_validate_fails_on_version_mismatch);
     return UNITY_END();

@@ -29,17 +29,26 @@
     </div>
     <p id="status-text">Sensor warming up…</p>
     <p>Switching frequency: <span id="switch-freq">0</span> /min</p>
+    <p title="2s rolling average of the mixture index. Should hover near 0 even during normal lean/rich dithering — a sustained offset indicates a real mixture bias, not just switching noise.">
+      Control quality (2s avg): <span id="avg-2s">-</span>
+    </p>
 
     <div class="stats-section">
       <div class="stats-section-title">Session Statistics</div>
       <div id="session-bar" class="stacked-bar"></div>
       <div id="session-labels" class="stacked-bar-label"></div>
+      <p style="font-size: 0.8rem;" title="Range of the 2s control-quality average over this session. Wide/off-center ranges indicate real mixture bias episodes, not just normal dither.">
+        Control quality range: <span id="session-avg2s-range">-</span>
+      </p>
     </div>
 
     <div class="stats-section">
       <div class="stats-section-title">Long-term Statistics</div>
       <div id="longterm-bar" class="stacked-bar"></div>
       <div id="longterm-labels" class="stacked-bar-label"></div>
+      <p style="font-size: 0.8rem;" title="Range of the 2s control-quality average since long-term stats were last reset. Wide/off-center ranges indicate real mixture bias episodes, not just normal dither.">
+        Control quality range: <span id="longterm-avg2s-range">-</span>
+      </p>
     </div>
 
     <div class="stats-legend" style="font-size: 0.8rem; margin-top: 0.5rem;">
@@ -82,6 +91,9 @@
       <p id="wizard-autocal-status">Ready</p>
       <p id="wizard-autocal-progress">0/100 samples</p>
     </div>
+    <hr>
+    <p>Firmware version: <span id="fw-version">-</span></p>
+    <p>Built: <span id="fw-build">-</span></p>
   </section>
 
   <section id="tab-ota" class="tab-panel">

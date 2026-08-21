@@ -9,6 +9,7 @@
 typedef struct {
     int32_t index_fast;
     int32_t index_slow_avg;
+    int32_t index_avg_2s;
     si_category_t category;
     warmup_state_t warmup_state;
     uint32_t switches_per_min;
