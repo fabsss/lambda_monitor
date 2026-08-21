@@ -235,27 +235,28 @@ const uplotInstance = new uPlot({
 
         const yValToPixel = (yVal) => plotBottom - ((yVal - yScale.min) / (yScale.max - yScale.min)) * plotHeight;
 
-        const richLower = u_lambda1_mv - deadband_mv;
-        const richUpper = u_lambda1_mv + deadband_mv;
-        const leanLower = u_lambda1_mv + deadband_mv;
-        const leanUpper = yScale.max;
+        const leanLower = yScale.min;
+        const leanUpper = u_lambda1_mv - deadband_mv;
+        const lambda1Lower = u_lambda1_mv - deadband_mv;
+        const lambda1Upper = u_lambda1_mv + deadband_mv;
+        const richLower = u_lambda1_mv + deadband_mv;
+        const richUpper = yScale.max;
 
-        const richY1 = yValToPixel(richUpper);
-        const richY2 = yValToPixel(richLower);
         const leanY1 = yValToPixel(leanUpper);
         const leanY2 = yValToPixel(leanLower);
-        const lambda1Y = yValToPixel(u_lambda1_mv);
-        const lambda1DeadbandY1 = yValToPixel(u_lambda1_mv + deadband_mv);
-        const lambda1DeadbandY2 = yValToPixel(u_lambda1_mv - deadband_mv);
+        const lambda1Y1 = yValToPixel(lambda1Upper);
+        const lambda1Y2 = yValToPixel(lambda1Lower);
+        const richY1 = yValToPixel(richUpper);
+        const richY2 = yValToPixel(richLower);
 
         ctx.fillStyle = 'rgba(255, 107, 107, 0.2)';
-        ctx.fillRect(u.bbox.left, richY1, u.bbox.width, richY2 - richY1);
+        ctx.fillRect(u.bbox.left, leanY1, u.bbox.width, leanY2 - leanY1);
 
         ctx.fillStyle = 'rgba(81, 207, 102, 0.2)';
-        ctx.fillRect(u.bbox.left, lambda1DeadbandY1, u.bbox.width, lambda1DeadbandY2 - lambda1DeadbandY1);
+        ctx.fillRect(u.bbox.left, lambda1Y1, u.bbox.width, lambda1Y2 - lambda1Y1);
 
         ctx.fillStyle = 'rgba(77, 171, 247, 0.2)';
-        ctx.fillRect(u.bbox.left, leanY1, u.bbox.width, leanY2 - leanY1);
+        ctx.fillRect(u.bbox.left, richY1, u.bbox.width, richY2 - richY1);
       }
     ]
   }
