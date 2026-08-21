@@ -1,5 +1,28 @@
 'use strict';
 
+/* Keep the screen on while this page is open (e.g. mounted in a car during
+ * a drive) — the wake lock is released by the browser whenever the tab is
+ * hidden, so re-acquire it on visibilitychange. Unsupported browsers just
+ * silently keep their normal screen-timeout behavior. */
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (e) {
+    console.error('wake lock request failed:', e);
+  }
+}
+requestWakeLock();
+
+document.addEventListener('visibilitychange', () => {
+  if (wakeLock === null && document.visibilityState === 'visible') {
+    requestWakeLock();
+  }
+});
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -22,6 +45,15 @@ function updateGauge(indexFast, indexSlow) {
   needleFast.setAttribute('transform', `rotate(${indexToAngle(indexFast)} 100 110)`);
   needleSlow.setAttribute('transform', `rotate(${indexToAngle(indexSlow)} 100 110)`);
 }
+
+const CATEGORY_SWATCHES = {
+  'bar-warmup': '#999',
+  'bar-very-lean': '#c92a2a',
+  'bar-lean': '#ff6b6b',
+  'bar-lambda1': '#51cf66',
+  'bar-rich': '#4dabf7',
+  'bar-very-rich': '#1864ab',
+};
 
 function renderStackedBar(elId, tWarmup, tVeryLean, tLean, tLambda1, tRich, tVeryRich) {
   const total = tWarmup + tVeryLean + tLean + tLambda1 + tRich + tVeryRich;
@@ -47,13 +79,52 @@ function renderStackedBar(elId, tWarmup, tVeryLean, tLean, tLambda1, tRich, tVer
     div.title = `${label}: ${seconds}s (${pct.toFixed(1)}%)`;
     el.appendChild(div);
   }
+}
 
-  const labelsEl = document.getElementById(elId.replace('bar', 'labels'));
-  if (labelsEl) {
-    labelsEl.innerHTML = segments.map(([, seconds, label]) =>
-      `<span>${label}: ${seconds}s (${total ? (seconds/total*100).toFixed(1) : 0}%)</span>`
-    ).join('');
+function formatAvg2sAvg(avg) {
+  const rounded = Math.round(avg * 10) / 10;
+  if (rounded > 0) return `+${rounded} (rich bias)`;
+  if (rounded < 0) return `${rounded} (lean bias)`;
+  return '0 (centered)';
+}
+
+function renderStatsTable(tableId, tWarmup, tVeryLean, tLean, tLambda1, tRich, tVeryRich, avg2sAvg) {
+  const total = tWarmup + tVeryLean + tLean + tLambda1 + tRich + tVeryRich;
+  const rows = [
+    ['bar-warmup', 'Warmup', tWarmup],
+    ['bar-very-lean', 'Very Lean', tVeryLean],
+    ['bar-lean', 'Lean', tLean],
+    ['bar-lambda1', 'λ=1', tLambda1],
+    ['bar-rich', 'Rich', tRich],
+    ['bar-very-rich', 'Very Rich', tVeryRich],
+  ];
+
+  const table = document.getElementById(tableId);
+  table.innerHTML = '';
+  for (const [cls, label, seconds] of rows) {
+    const pct = total ? (seconds / total * 100).toFixed(1) : '0.0';
+    const tr = document.createElement('tr');
+    const labelTd = document.createElement('td');
+    const swatch = document.createElement('span');
+    swatch.className = 'swatch';
+    swatch.style.background = CATEGORY_SWATCHES[cls];
+    labelTd.appendChild(swatch);
+    labelTd.appendChild(document.createTextNode(label));
+    const valueTd = document.createElement('td');
+    valueTd.textContent = `${seconds}s (${pct}%)`;
+    tr.appendChild(labelTd);
+    tr.appendChild(valueTd);
+    table.appendChild(tr);
   }
+
+  const avgTr = document.createElement('tr');
+  const avgLabelTd = document.createElement('td');
+  avgLabelTd.textContent = 'Ø Control quality';
+  const avgValueTd = document.createElement('td');
+  avgValueTd.textContent = formatAvg2sAvg(avg2sAvg);
+  avgTr.appendChild(avgLabelTd);
+  avgTr.appendChild(avgValueTd);
+  table.appendChild(avgTr);
 }
 
 let lastLiveMv = 0;
@@ -63,10 +134,9 @@ async function updateLiveData() {
     const res = await fetch('/api/snapshot');
     const data = await res.json();
     updateGauge(data.index_fast, data.index_slow_avg);
+    document.getElementById('live-mv').textContent = data.raw_mv;
     document.getElementById('switch-freq').textContent = data.switches_per_min;
-    const avg2s = data.index_avg_2s;
-    const avg2sLabel = avg2s > 0 ? `+${avg2s} (rich bias)` : avg2s < 0 ? `${avg2s} (lean bias)` : '0 (centered)';
-    document.getElementById('avg-2s').textContent = avg2sLabel;
+    document.getElementById('avg-2s').textContent = formatAvg2sAvg(data.index_avg_2s);
     document.getElementById('status-text').textContent =
       data.warmup_state === 0 ? 'Sensor warming up…' : 'Sensor ready';
     document.getElementById('wizard-live-mv').textContent = data.raw_mv + ' mV';
@@ -104,18 +174,13 @@ async function refreshVersion() {
 }
 refreshVersion();
 
-function formatAvg2sRange(min, max) {
-  if (min > max) return 'n/a'; /* no non-warmup samples recorded yet */
-  return `${min} … ${max}`;
-}
-
 async function refreshStats() {
   const res = await fetch('/api/stats');
   const data = await res.json();
   renderStackedBar('session-bar', data.session.t_warmup_s, data.session.t_very_lean_s, data.session.t_lean_s, data.session.t_lambda1_s, data.session.t_rich_s, data.session.t_very_rich_s);
   renderStackedBar('longterm-bar', data.t_warmup_s, data.t_very_lean_s, data.t_lean_s, data.t_lambda1_s, data.t_rich_s, data.t_very_rich_s);
-  document.getElementById('session-avg2s-range').textContent = formatAvg2sRange(data.session.avg2s_min, data.session.avg2s_max);
-  document.getElementById('longterm-avg2s-range').textContent = formatAvg2sRange(data.avg2s_min, data.avg2s_max);
+  renderStatsTable('session-table', data.session.t_warmup_s, data.session.t_very_lean_s, data.session.t_lean_s, data.session.t_lambda1_s, data.session.t_rich_s, data.session.t_very_rich_s, data.session.avg2s_avg);
+  renderStatsTable('longterm-table', data.t_warmup_s, data.t_very_lean_s, data.t_lean_s, data.t_lambda1_s, data.t_rich_s, data.t_very_rich_s, data.avg2s_avg);
 }
 setInterval(refreshStats, 2000);
 refreshStats();
@@ -283,6 +348,18 @@ const uplotInstance = new uPlot({
   }
 }, chartData, chartContainer);
 
+/* Inverse of si_mv_to_index() (lib/signal_interpreter/signal_interpreter.c):
+ * piecewise-linear around u_lambda1_mv, using the live calibration rather
+ * than hardcoded defaults. The lean and rich sides can have different
+ * spans (u_lambda1 - u_min vs u_max - u_lambda1), so a single symmetric
+ * linear formula is wrong and clips lean-side extremes off the y-axis. */
+function indexToMv(idx, cfg) {
+  if (idx <= 0) {
+    return cfg.u_lambda1_mv + (idx / 100) * (cfg.u_lambda1_mv - cfg.u_min_mv);
+  }
+  return cfg.u_lambda1_mv + (idx / 100) * (cfg.u_max_mv - cfg.u_lambda1_mv);
+}
+
 window.resizeChartToContainer = () => {
   uplotInstance.setSize({ width: chartContainer.clientWidth, height: 350 });
 };
@@ -307,7 +384,7 @@ async function refreshChart() {
       const ts = data.timestamps_s[i];
       if (ts >= cutoff) {
         const idx = data.index_values[i];
-        const mv = 320 + (idx / 100) * (2880 - 320);
+        const mv = indexToMv(idx, chartConfig);
         xs.push(ts);
         ys.push(mv);
       }

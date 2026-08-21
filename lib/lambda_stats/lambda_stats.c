@@ -8,8 +8,6 @@ void lambda_stats_reset(lambda_longterm_stats_t *stats)
     stats->struct_version = LAMBDA_STATS_VERSION;
     stats->index_min = 100;
     stats->index_max = -100;
-    stats->avg2s_min = 100;
-    stats->avg2s_max = -100;
 }
 
 void lambda_stats_accumulate(lambda_longterm_stats_t *stats, si_category_t category, int32_t index, uint32_t delta_s, bool in_warmup)
@@ -54,12 +52,8 @@ void lambda_stats_track_avg2s(lambda_longterm_stats_t *stats, int32_t avg_2s, bo
     if (in_warmup) {
         return;
     }
-    if (avg_2s < stats->avg2s_min) {
-        stats->avg2s_min = (int16_t)avg_2s;
-    }
-    if (avg_2s > stats->avg2s_max) {
-        stats->avg2s_max = (int16_t)avg_2s;
-    }
+    stats->avg2s_sum += avg_2s;
+    stats->avg2s_count += 1;
 }
 
 void lambda_stats_finalize_crc(lambda_longterm_stats_t *stats)

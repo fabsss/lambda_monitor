@@ -28,6 +28,7 @@
       <div class="gauge-legend-item"><span class="gauge-legend-color" style="background:#666;"></span>Slow (5s avg)</div>
     </div>
     <p id="status-text">Sensor warming up…</p>
+    <p>Voltage: <span id="live-mv">-</span> mV</p>
     <p>Switching frequency: <span id="switch-freq">0</span> /min</p>
     <p title="2s rolling average of the mixture index. Should hover near 0 even during normal lean/rich dithering — a sustained offset indicates a real mixture bias, not just switching noise.">
       Control quality (2s avg): <span id="avg-2s">-</span>
@@ -36,19 +37,13 @@
     <div class="stats-section">
       <div class="stats-section-title">Session Statistics</div>
       <div id="session-bar" class="stacked-bar"></div>
-      <div id="session-labels" class="stacked-bar-label"></div>
-      <p style="font-size: 0.8rem;" title="Range of the 2s control-quality average over this session. Wide/off-center ranges indicate real mixture bias episodes, not just normal dither.">
-        Control quality range: <span id="session-avg2s-range">-</span>
-      </p>
+      <table class="stats-table" id="session-table"></table>
     </div>
 
     <div class="stats-section">
       <div class="stats-section-title">Long-term Statistics</div>
       <div id="longterm-bar" class="stacked-bar"></div>
-      <div id="longterm-labels" class="stacked-bar-label"></div>
-      <p style="font-size: 0.8rem;" title="Range of the 2s control-quality average since long-term stats were last reset. Wide/off-center ranges indicate real mixture bias episodes, not just normal dither.">
-        Control quality range: <span id="longterm-avg2s-range">-</span>
-      </p>
+      <table class="stats-table" id="longterm-table"></table>
     </div>
 
     <div class="stats-legend" style="font-size: 0.8rem; margin-top: 0.5rem;">

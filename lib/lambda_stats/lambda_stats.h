@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include "signal_interpreter.h"
 
-#define LAMBDA_STATS_VERSION 3
+#define LAMBDA_STATS_VERSION 4
 
 /**
  * @brief Versioned, checksummed long-term statistics struct (spec §4.4).
@@ -25,8 +25,8 @@ typedef struct __attribute__((packed)) {
     int16_t  index_min;
     int16_t  index_max;
     uint32_t total_runtime_s;
-    int16_t  avg2s_min;   /* Most negative (leanest) 2s rolling-average seen, spec see adc_task.c AVG_WINDOW_S */
-    int16_t  avg2s_max;   /* Most positive (richest) 2s rolling-average seen */
+    int64_t  avg2s_sum;    /* Running sum of 2s rolling-average samples (index units), see adc_task.c AVG_WINDOW_S */
+    uint32_t avg2s_count;  /* Number of avg2s samples summed; avg2s_sum/avg2s_count = long-term control-quality average */
     uint32_t crc32;
 } lambda_longterm_stats_t;
 
@@ -61,11 +61,12 @@ void lambda_stats_reset(lambda_longterm_stats_t *stats);
 void lambda_stats_accumulate(lambda_longterm_stats_t *stats, si_category_t category, int32_t index, uint32_t delta_s, bool in_warmup);
 
 /**
- * @brief Track the extremes of the rolling 2s control-quality average.
+ * @brief Accumulate one sample of the rolling 2s control-quality average
+ *        into the running sum/count used to compute its long-term mean.
  *
  * A symmetrically-dithering closed loop should keep this average near 0
  * even while instantaneous readings swing lean/rich; a sustained non-zero
- * extreme indicates a real mixture bias episode rather than normal dither.
+ * long-term mean indicates a real mixture bias rather than normal dither.
  * Excluded during warmup, same rationale as index_min/index_max.
  *
  * @param stats   Pointer to stats struct to update.

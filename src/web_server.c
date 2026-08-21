@@ -18,6 +18,11 @@
 static const char *TAG = "web_server";
 static httpd_handle_t s_server = NULL;
 
+static double avg2s_average(const lambda_longterm_stats_t *stats)
+{
+    return stats->avg2s_count > 0 ? (double)stats->avg2s_sum / (double)stats->avg2s_count : 0.0;
+}
+
 static bool calibration_is_valid(const si_calibration_t *cal)
 {
     if (cal->u_min_mv < ADC_MV_MIN || cal->u_min_mv > ADC_MV_MAX) return false;
@@ -87,8 +92,7 @@ static esp_err_t stats_get_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "t_very_rich_s", longterm.t_very_rich_s);
     cJSON_AddNumberToObject(root, "index_min", longterm.index_min);
     cJSON_AddNumberToObject(root, "index_max", longterm.index_max);
-    cJSON_AddNumberToObject(root, "avg2s_min", longterm.avg2s_min);
-    cJSON_AddNumberToObject(root, "avg2s_max", longterm.avg2s_max);
+    cJSON_AddNumberToObject(root, "avg2s_avg", avg2s_average(&longterm));
     cJSON_AddNumberToObject(root, "total_runtime_s", longterm.total_runtime_s);
 
     cJSON *session_obj = cJSON_CreateObject();
@@ -100,8 +104,7 @@ static esp_err_t stats_get_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(session_obj, "t_very_rich_s", session.t_very_rich_s);
     cJSON_AddNumberToObject(session_obj, "index_min", session.index_min);
     cJSON_AddNumberToObject(session_obj, "index_max", session.index_max);
-    cJSON_AddNumberToObject(session_obj, "avg2s_min", session.avg2s_min);
-    cJSON_AddNumberToObject(session_obj, "avg2s_max", session.avg2s_max);
+    cJSON_AddNumberToObject(session_obj, "avg2s_avg", avg2s_average(&session));
     cJSON_AddNumberToObject(session_obj, "total_runtime_s", session.total_runtime_s);
     cJSON_AddItemToObject(root, "session", session_obj);
 

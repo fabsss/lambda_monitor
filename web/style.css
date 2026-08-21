@@ -12,8 +12,11 @@ nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
 .stats-section { margin: 1rem 0; }
 .stats-section-title { font-weight: bold; font-size: 0.9rem; margin-bottom: 0.25rem; }
 .stacked-bar { display: flex; height: 1.5rem; width: 100%; margin: 0.25rem 0; overflow: hidden; border: 1px solid #ccc; }
-.stacked-bar-label { display: flex; gap: 2rem; font-size: 0.8rem; margin-top: 0.25rem; }
-.stacked-bar-label span { min-width: 60px; }
+
+.stats-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 0.25rem; }
+.stats-table td { padding: 0.15rem 0.4rem 0.15rem 0; white-space: nowrap; }
+.stats-table td:first-child { display: flex; align-items: center; gap: 0.3rem; }
+.stats-table .swatch { display: inline-block; width: 0.7rem; height: 0.7rem; flex-shrink: 0; }
 
 .bar-warmup { background: #999; }
 .bar-very-lean { background: #c92a2a; }
