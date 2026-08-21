@@ -111,6 +111,7 @@ static esp_err_t stats_get_handler(httpd_req_t *req)
 
 static esp_err_t reset_post_handler(httpd_req_t *req)
 {
+    adc_task_reset_longterm_stats();
     nvs_store_reset_longterm();
     httpd_resp_send(req, "{\"ok\":true}", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;

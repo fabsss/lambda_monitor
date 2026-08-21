@@ -169,6 +169,13 @@ void adc_task_get_session_stats(lambda_longterm_stats_t *out)
     xSemaphoreGive(s_mutex);
 }
 
+void adc_task_reset_longterm_stats(void)
+{
+    xSemaphoreTake(s_mutex, portMAX_DELAY);
+    lambda_stats_reset(&s_longterm);
+    xSemaphoreGive(s_mutex);
+}
+
 void adc_task_autocal_start(void)
 {
     xSemaphoreTake(s_mutex, portMAX_DELAY);
