@@ -61,3 +61,14 @@ otherwise — catches a dirty/mismatched tree before it ships), and attaches
 `firmware.bin` + `bootloader.bin` + `partitions.bin` to a GitHub Release
 via `softprops/action-gh-release`. Pushing a tag (`git push origin vX.Y.Z`)
 is what triggers it — nothing else to do manually.
+
+**`src/frontend_assets.h` is gitignored, not tracked.** It's generated
+deterministically from `web/*` by `tools/embed_frontend.py`'s `pre:` build
+step on every `pio run`. It used to be committed, which caused CI's
+version-verify step to fail: a fresh checkout's committed copy could carry
+a stale cache-hash comment (drifted out of sync from a `git add` that
+happened before the embedded content was regenerated for the final commit),
+so rebuilding it during CI touched exactly that one comment line and made
+the tree look "dirty" to `git describe`, even with byte-identical embedded
+HTML/JS. Do not re-add it to git — if you ever need to inspect the
+generated output, it's on disk after any `pio run`, just untracked.
