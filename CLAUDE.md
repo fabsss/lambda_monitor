@@ -72,3 +72,46 @@ so rebuilding it during CI touched exactly that one comment line and made
 the tree look "dirty" to `git describe`, even with byte-identical embedded
 HTML/JS. Do not re-add it to git — if you ever need to inspect the
 generated output, it's on disk after any `pio run`, just untracked.
+
+## Long-term stats persistence across firmware updates
+
+`lambda_longterm_stats_t` (`lib/lambda_stats/lambda_stats.h`) is stored in
+NVS and carries a `struct_version` (`LAMBDA_STATS_VERSION`) plus a CRC-32,
+checked by `lambda_stats_validate()`. `nvs_store_load_stats()` no longer
+falls straight back to a zeroed reset when that check fails on a version
+bump — it first calls `lambda_stats_migrate_legacy()`, which recognizes
+older on-disk layouts (by blob size, embedded version, and that version's
+own CRC) and carries forward whatever fields the old layout had.
+
+**Rule: whenever `LAMBDA_STATS_VERSION` is bumped, add the struct's
+*previous* shape as a new `legacy_stats_vN_t` + migration case in
+`lambda_stats.c`** (see the existing v1/v2/v3 cases) instead of accepting
+that flashing the new firmware wipes the device's long-term stats. A field
+that's genuinely new (no equivalent in the old layout) is left at its
+`lambda_stats_reset()` default — only truly-unrecoverable data should be
+lost, not everything.
+
+`nvs_store_load_config()` (calibration) has no such version gate — it only
+checks blob size, so it isn't affected by this and doesn't need migration
+cases when `si_calibration_t` changes shape, since a size mismatch there
+already falls back to `si_default_calibration()` safely (recalibration is
+cheap; long-term stats are not).
+
+## Wi-Fi AP connectivity-check responses must not claim internet access
+
+`src/web_server.c`'s `/*` wildcard handler (`captive_portal_handler`)
+answers every unmatched path — including the OS connectivity-check URLs
+(`generate_204`, `hotspot-detect.html`, `connecttest.txt`, ...) — with a
+`302` redirect to the device's own web UI, never a bare `204`/`200`.
+
+**Pitfall: answering a connectivity check with "success" makes phones drop
+mobile data.** This AP has no internet uplink. A prior version special-cased
+`/generate_204` to return `204 No Content` specifically to silence
+Android's "No Internet" notification — but that also makes the phone
+believe this Wi-Fi network has full internet access, which can cause it to
+deprioritize/disable mobile data while connected (reported: mobile data
+turns off while parked/driving with the AP joined, unlike a real hotspot
+with no internet, which correctly leaves mobile data active). Do not
+reintroduce a per-path `204`/`200` "success" response for any connectivity-
+check URL — the redirect is what tells the OS "no internet here, don't
+route through this network," which is what keeps mobile data usable.

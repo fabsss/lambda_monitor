@@ -1,5 +1,7 @@
 #include <unity.h>
+#include <string.h>
 #include "lambda_stats.h"
+#include "crc32.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -129,6 +131,123 @@ void test_validate_fails_on_version_mismatch(void)
     TEST_ASSERT_FALSE(lambda_stats_validate(&stats));
 }
 
+/* Mirrors of the legacy on-disk layouts kept privately in lambda_stats.c,
+ * used here only to build fixture bytes for lambda_stats_migrate_legacy()
+ * without exposing those historical structs outside the module. */
+
+typedef struct __attribute__((packed)) {
+    uint16_t struct_version;
+    uint32_t t_warmup_s;
+    uint32_t t_lean_s;
+    uint32_t t_lambda1_s;
+    uint32_t t_rich_s;
+    int16_t  index_min;
+    int16_t  index_max;
+    uint32_t total_runtime_s;
+    uint32_t crc32;
+} legacy_stats_v1_t;
+
+typedef struct __attribute__((packed)) {
+    uint16_t struct_version;
+    uint32_t t_warmup_s;
+    uint32_t t_very_lean_s;
+    uint32_t t_lean_s;
+    uint32_t t_lambda1_s;
+    uint32_t t_rich_s;
+    uint32_t t_very_rich_s;
+    int16_t  index_min;
+    int16_t  index_max;
+    uint32_t total_runtime_s;
+    int16_t  avg2s_min;
+    int16_t  avg2s_max;
+    uint32_t crc32;
+} legacy_stats_v3_t;
+
+void test_migrate_legacy_v1_recovers_time_buckets(void)
+{
+    legacy_stats_v1_t rec;
+    memset(&rec, 0, sizeof(rec));
+    rec.struct_version = 1;
+    rec.t_warmup_s = 11;
+    rec.t_lean_s = 22;
+    rec.t_lambda1_s = 33;
+    rec.t_rich_s = 44;
+    rec.index_min = -60;
+    rec.index_max = 70;
+    rec.total_runtime_s = 110;
+    rec.crc32 = crc32_compute(&rec, sizeof(rec));
+
+    lambda_longterm_stats_t out;
+    memset(&out, 0xAA, sizeof(out));
+    TEST_ASSERT_TRUE(lambda_stats_migrate_legacy(&out, &rec, sizeof(rec)));
+
+    TEST_ASSERT_EQUAL_UINT16(LAMBDA_STATS_VERSION, out.struct_version);
+    TEST_ASSERT_EQUAL_UINT32(11, out.t_warmup_s);
+    TEST_ASSERT_EQUAL_UINT32(0, out.t_very_lean_s);
+    TEST_ASSERT_EQUAL_UINT32(22, out.t_lean_s);
+    TEST_ASSERT_EQUAL_UINT32(33, out.t_lambda1_s);
+    TEST_ASSERT_EQUAL_UINT32(44, out.t_rich_s);
+    TEST_ASSERT_EQUAL_UINT32(0, out.t_very_rich_s);
+    TEST_ASSERT_EQUAL_INT16(-60, out.index_min);
+    TEST_ASSERT_EQUAL_INT16(70, out.index_max);
+    TEST_ASSERT_EQUAL_UINT32(110, out.total_runtime_s);
+    TEST_ASSERT_EQUAL_INT64(0, out.avg2s_sum);
+    TEST_ASSERT_EQUAL_UINT32(0, out.avg2s_count);
+}
+
+void test_migrate_legacy_v3_recovers_all_dwell_buckets(void)
+{
+    legacy_stats_v3_t rec;
+    memset(&rec, 0, sizeof(rec));
+    rec.struct_version = 3;
+    rec.t_warmup_s = 1;
+    rec.t_very_lean_s = 2;
+    rec.t_lean_s = 3;
+    rec.t_lambda1_s = 4;
+    rec.t_rich_s = 5;
+    rec.t_very_rich_s = 6;
+    rec.index_min = -80;
+    rec.index_max = 90;
+    rec.total_runtime_s = 21;
+    rec.avg2s_min = -10;
+    rec.avg2s_max = 10;
+    rec.crc32 = crc32_compute(&rec, sizeof(rec));
+
+    lambda_longterm_stats_t out;
+    memset(&out, 0xAA, sizeof(out));
+    TEST_ASSERT_TRUE(lambda_stats_migrate_legacy(&out, &rec, sizeof(rec)));
+
+    TEST_ASSERT_EQUAL_UINT32(1, out.t_warmup_s);
+    TEST_ASSERT_EQUAL_UINT32(2, out.t_very_lean_s);
+    TEST_ASSERT_EQUAL_UINT32(3, out.t_lean_s);
+    TEST_ASSERT_EQUAL_UINT32(4, out.t_lambda1_s);
+    TEST_ASSERT_EQUAL_UINT32(5, out.t_rich_s);
+    TEST_ASSERT_EQUAL_UINT32(6, out.t_very_rich_s);
+    TEST_ASSERT_EQUAL_INT16(-80, out.index_min);
+    TEST_ASSERT_EQUAL_INT16(90, out.index_max);
+    TEST_ASSERT_EQUAL_UINT32(21, out.total_runtime_s);
+}
+
+void test_migrate_legacy_rejects_corrupt_blob(void)
+{
+    legacy_stats_v1_t rec;
+    memset(&rec, 0, sizeof(rec));
+    rec.struct_version = 1;
+    rec.t_warmup_s = 5;
+    rec.crc32 = crc32_compute(&rec, sizeof(rec));
+    rec.t_warmup_s += 1; /* corrupt after CRC was computed */
+
+    lambda_longterm_stats_t out;
+    TEST_ASSERT_FALSE(lambda_stats_migrate_legacy(&out, &rec, sizeof(rec)));
+}
+
+void test_migrate_legacy_rejects_unknown_size(void)
+{
+    uint8_t junk[7] = {0};
+    lambda_longterm_stats_t out;
+    TEST_ASSERT_FALSE(lambda_stats_migrate_legacy(&out, junk, sizeof(junk)));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -141,5 +260,9 @@ int main(void)
     RUN_TEST(test_track_avg2s_excludes_warmup);
     RUN_TEST(test_finalize_and_validate_round_trip);
     RUN_TEST(test_validate_fails_on_version_mismatch);
+    RUN_TEST(test_migrate_legacy_v1_recovers_time_buckets);
+    RUN_TEST(test_migrate_legacy_v3_recovers_all_dwell_buckets);
+    RUN_TEST(test_migrate_legacy_rejects_corrupt_blob);
+    RUN_TEST(test_migrate_legacy_rejects_unknown_size);
     return UNITY_END();
 }

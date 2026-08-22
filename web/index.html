@@ -91,6 +91,18 @@
     <hr>
     <p>Firmware version: <span id="fw-version">-</span></p>
     <p>Built: <span id="fw-build">-</span></p>
+
+    <hr>
+    <div class="stats-section-title">Access Point</div>
+    <p>Current network name: <span id="wifi-current-ssid">-</span></p>
+    <form id="wifi-form">
+      <label>Network name (SSID) <input name="ssid" type="text" maxlength="32" required></label>
+      <label>Password <input name="password" type="text" maxlength="64" placeholder="leave empty for an open network"></label>
+      <p style="font-size: 0.8rem;">Password must be empty (open network) or 8-64 characters. Re-enter it every
+        time you save, even if unchanged - it is never shown here. Saving reboots the device; reconnect using
+        the new name/password afterward.</p>
+      <button type="submit">Save &amp; Reboot</button>
+    </form>
   </section>
 
   <section id="tab-ota" class="tab-panel">

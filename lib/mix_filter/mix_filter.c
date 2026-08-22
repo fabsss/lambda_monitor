@@ -27,25 +27,36 @@ int32_t fast_filter_push(fast_filter_t *f, int32_t mv)
 
 void slow_filter_init(slow_filter_t *f, uint32_t window_s)
 {
-    f->sum = 0;
-    f->count = 0;
+    if (window_s < 1) {
+        window_s = 1;
+    } else if (window_s > SLOW_FILTER_MAX_WINDOW_S) {
+        window_s = SLOW_FILTER_MAX_WINDOW_S;
+    }
+
+    for (uint32_t i = 0; i < SLOW_FILTER_MAX_WINDOW_S; i++) {
+        f->samples[i] = 0;
+    }
     f->window_s = window_s;
-    f->elapsed_s = 0;
+    f->count = 0;
+    f->next = 0;
+    f->sum = 0;
     f->last_avg = 0;
 }
 
 void slow_filter_push(slow_filter_t *f, int32_t value, uint32_t delta_s)
 {
-    f->sum += value;
-    f->count++;
-    f->elapsed_s += delta_s;
+    (void)delta_s;
 
-    if (f->elapsed_s >= f->window_s) {
-        f->last_avg = f->sum / (int32_t)f->count;
-        f->sum = 0;
-        f->count = 0;
-        f->elapsed_s = 0;
+    if (f->count < f->window_s) {
+        f->sum += value;
+        f->count++;
+    } else {
+        f->sum += value - f->samples[f->next];
     }
+    f->samples[f->next] = value;
+    f->next = (f->next + 1) % f->window_s;
+
+    f->last_avg = (int32_t)(f->sum / (int64_t)f->count);
 }
 
 int32_t slow_filter_average(const slow_filter_t *f)
