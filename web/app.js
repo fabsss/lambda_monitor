@@ -174,6 +174,38 @@ async function refreshVersion() {
 }
 refreshVersion();
 
+async function refreshWifi() {
+  try {
+    const res = await fetch('/api/wifi');
+    const data = await res.json();
+    document.getElementById('wifi-current-ssid').textContent = data.ssid;
+    document.querySelector('#wifi-form [name=ssid]').value = data.ssid;
+  } catch (e) {
+    console.error('wifi fetch failed:', e);
+  }
+}
+refreshWifi();
+
+document.getElementById('wifi-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = new FormData(e.target);
+  const ssid = form.get('ssid');
+  const password = form.get('password');
+  if (!confirm(`Save access point "${ssid}" and reboot? You will need to reconnect using the new name/password.`)) {
+    return;
+  }
+  const res = await fetch('/api/wifi', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ssid, password })
+  });
+  if (!res.ok) {
+    alert('Failed to save access point settings: ' + (await res.text()));
+  } else {
+    alert('Saved. Device is rebooting - reconnect using the new name/password.');
+  }
+});
+
 async function refreshStats() {
   const res = await fetch('/api/stats');
   const data = await res.json();

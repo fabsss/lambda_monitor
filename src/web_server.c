@@ -7,11 +7,15 @@
 #include "signal_interpreter.h"
 #include "ring_buffer.h"
 #include "ota_task.h"
+#include "wifi_ap.h"
 
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_app_desc.h"
+#include "esp_system.h"
 #include "cJSON.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <string.h>
 #include <stdbool.h>
 
@@ -350,10 +354,93 @@ static esp_err_t captive_portal_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* Reports the SoftAP credentials currently in effect (custom if saved,
+ * otherwise the compiled-in default) - mirrors the fallback wifi_ap_start()
+ * applies at boot, so this always reflects reality. Password is never
+ * echoed back; only whether one is set. */
+static esp_err_t wifi_get_handler(httpd_req_t *req)
+{
+    wifi_ap_credentials_t creds;
+    nvs_store_load_wifi_credentials(&creds, WIFI_AP_SSID, WIFI_AP_PASSWORD);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "ssid", creds.ssid);
+    cJSON_AddBoolToObject(root, "has_password", strlen(creds.password) > 0);
+
+    char *json = cJSON_PrintUnformatted(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+    cJSON_free(json);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+/* Same constraints esp_wifi_set_config() enforces for WIFI_MODE_AP - reject
+ * anything outside them here so an invalid config can never be persisted
+ * (nvs_store_load_wifi_credentials() re-checks this on load as a second
+ * line of defense, but the point is to never need that fallback). */
+static bool wifi_credentials_is_valid(const char *ssid, const char *password)
+{
+    size_t ssid_len = strlen(ssid);
+    size_t pass_len = strlen(password);
+    if (ssid_len == 0 || ssid_len > WIFI_AP_SSID_MAX_LEN) return false;
+    if (pass_len != 0 && (pass_len < 8 || pass_len > WIFI_AP_PASSWORD_MAX_LEN)) return false;
+    return true;
+}
+
+/* Saves new SoftAP credentials and reboots to apply them (like OTA, the AP
+ * has to restart to broadcast under the new SSID/password, so clients
+ * reconnect manually afterward). Password is required on every save - an
+ * empty password means "make this an open network", not "keep the
+ * current one" (same convention wifi_ap_start() already used for the
+ * compiled-in default). */
+static esp_err_t wifi_post_handler(httpd_req_t *req)
+{
+    /* Room for a 32-byte SSID and a 64-byte password plus JSON framing,
+     * with headroom for characters that need JSON-escaping (e.g. a
+     * password containing a literal quote or backslash). */
+    char buf[256];
+    if (recv_body(req, buf, sizeof(buf)) < 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
+        return ESP_FAIL;
+    }
+
+    cJSON *root = cJSON_Parse(buf);
+    if (!root) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "JSON parse error");
+        return ESP_FAIL;
+    }
+
+    cJSON *ssid_item = cJSON_GetObjectItem(root, "ssid");
+    cJSON *password_item = cJSON_GetObjectItem(root, "password");
+    const char *ssid = (ssid_item && cJSON_IsString(ssid_item)) ? ssid_item->valuestring : "";
+    const char *password = (password_item && cJSON_IsString(password_item)) ? password_item->valuestring : "";
+
+    if (!wifi_credentials_is_valid(ssid, password)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+            "SSID must be 1-32 chars; password must be empty (open network) or 8-64 chars");
+        return ESP_FAIL;
+    }
+
+    wifi_ap_credentials_t creds = { 0 };
+    strncpy(creds.ssid, ssid, sizeof(creds.ssid) - 1);
+    strncpy(creds.password, password, sizeof(creds.password) - 1);
+    cJSON_Delete(root);
+
+    nvs_store_save_wifi_credentials(&creds);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, "{\"ok\":true,\"rebooting\":true}", HTTPD_RESP_USE_STRLEN);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    esp_restart();
+    return ESP_OK;
+}
+
 void web_server_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 16;
+    config.max_uri_handlers = 20;
     esp_err_t err = httpd_start(&s_server, &config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start failed: %s", esp_err_to_name(err));
@@ -376,6 +463,8 @@ void web_server_start(void)
         { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },
         { .uri = "/api/ota", .method = HTTP_POST, .handler = ota_post_handler },
         { .uri = "/api/version", .method = HTTP_GET, .handler = version_get_handler },
+        { .uri = "/api/wifi", .method = HTTP_GET, .handler = wifi_get_handler },
+        { .uri = "/api/wifi", .method = HTTP_POST, .handler = wifi_post_handler },
         { .uri = "/*", .method = HTTP_GET, .handler = captive_portal_handler },
     };
 

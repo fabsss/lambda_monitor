@@ -7,6 +7,7 @@
 #define NVS_NAMESPACE "lambda_mon"
 #define KEY_STATS "lt_stats"
 #define KEY_CONFIG "config"
+#define KEY_WIFI "wifi_cred"
 
 static const char *TAG = "nvs_store";
 
@@ -110,4 +111,29 @@ void nvs_store_reset_longterm(void)
     lambda_stats_reset(&fresh);
     lambda_stats_finalize_crc(&fresh);
     save_blob(KEY_STATS, &fresh, sizeof(fresh));
+}
+
+void nvs_store_load_wifi_credentials(wifi_ap_credentials_t *out, const char *default_ssid, const char *default_password)
+{
+    if (load_blob(KEY_WIFI, out, sizeof(*out))) {
+        out->ssid[sizeof(out->ssid) - 1] = '\0';
+        out->password[sizeof(out->password) - 1] = '\0';
+
+        size_t ssid_len = strlen(out->ssid);
+        size_t pass_len = strlen(out->password);
+        bool ssid_ok = ssid_len > 0 && ssid_len <= WIFI_AP_SSID_MAX_LEN;
+        bool pass_ok = pass_len == 0 || (pass_len >= 8 && pass_len <= WIFI_AP_PASSWORD_MAX_LEN);
+        if (ssid_ok && pass_ok) {
+            return;
+        }
+    }
+
+    memset(out, 0, sizeof(*out));
+    strncpy(out->ssid, default_ssid, sizeof(out->ssid) - 1);
+    strncpy(out->password, default_password, sizeof(out->password) - 1);
+}
+
+void nvs_store_save_wifi_credentials(const wifi_ap_credentials_t *creds)
+{
+    save_blob(KEY_WIFI, creds, sizeof(*creds));
 }
