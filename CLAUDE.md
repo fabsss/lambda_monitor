@@ -96,3 +96,22 @@ checks blob size, so it isn't affected by this and doesn't need migration
 cases when `si_calibration_t` changes shape, since a size mismatch there
 already falls back to `si_default_calibration()` safely (recalibration is
 cheap; long-term stats are not).
+
+## Wi-Fi AP connectivity-check responses must not claim internet access
+
+`src/web_server.c`'s `/*` wildcard handler (`captive_portal_handler`)
+answers every unmatched path — including the OS connectivity-check URLs
+(`generate_204`, `hotspot-detect.html`, `connecttest.txt`, ...) — with a
+`302` redirect to the device's own web UI, never a bare `204`/`200`.
+
+**Pitfall: answering a connectivity check with "success" makes phones drop
+mobile data.** This AP has no internet uplink. A prior version special-cased
+`/generate_204` to return `204 No Content` specifically to silence
+Android's "No Internet" notification — but that also makes the phone
+believe this Wi-Fi network has full internet access, which can cause it to
+deprioritize/disable mobile data while connected (reported: mobile data
+turns off while parked/driving with the AP joined, unlike a real hotspot
+with no internet, which correctly leaves mobile data active). Do not
+reintroduce a per-path `204`/`200` "success" response for any connectivity-
+check URL — the redirect is what tells the OS "no internet here, don't
+route through this network," which is what keeps mobile data usable.

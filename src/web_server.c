@@ -330,17 +330,18 @@ static esp_err_t autocal_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-/* Android connectivity check: respond with 204 No Content.
- * This prevents Android from showing "No Internet" warning on the AP. */
-static esp_err_t connectivity_check_handler(httpd_req_t *req)
-{
-    httpd_resp_set_status(req, "204 No Content");
-    httpd_resp_send(req, NULL, 0);
-    return ESP_OK;
-}
-
 /* Captive portal: redirect unknown URIs to home page.
- * Catches requests to captive.apple.com, etc. */
+ * Catches requests to captive.apple.com, connectivitycheck.gstatic.com/
+ * generate_204, msftconnecttest.com/connecttest.txt, etc. - deliberately
+ * NOT a 204/200 "success" response. This AP has no internet uplink, and
+ * answering the OS's connectivity check with "success" makes the phone
+ * treat this Wi-Fi as a full internet connection, which can lead it to
+ * disable/deprioritize mobile data. Redirecting instead makes the OS
+ * correctly detect "no internet, captive portal" - it keeps mobile data
+ * active for real internet access and (on most OSes) offers a "sign in
+ * to network" prompt that conveniently opens straight to this device's
+ * web UI. Do not special-case /generate_204 (or similar) back to a bare
+ * 204/200 - that reintroduces the mobile-data-drops-out bug. */
 static esp_err_t captive_portal_handler(httpd_req_t *req)
 {
     httpd_resp_set_status(req, "302 Found");
@@ -375,7 +376,6 @@ void web_server_start(void)
         { .uri = "/api/curve", .method = HTTP_GET, .handler = curve_get_handler },
         { .uri = "/api/ota", .method = HTTP_POST, .handler = ota_post_handler },
         { .uri = "/api/version", .method = HTTP_GET, .handler = version_get_handler },
-        { .uri = "/generate_204", .method = HTTP_GET, .handler = connectivity_check_handler },
         { .uri = "/*", .method = HTTP_GET, .handler = captive_portal_handler },
     };
 
