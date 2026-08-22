@@ -72,3 +72,27 @@ so rebuilding it during CI touched exactly that one comment line and made
 the tree look "dirty" to `git describe`, even with byte-identical embedded
 HTML/JS. Do not re-add it to git — if you ever need to inspect the
 generated output, it's on disk after any `pio run`, just untracked.
+
+## Long-term stats persistence across firmware updates
+
+`lambda_longterm_stats_t` (`lib/lambda_stats/lambda_stats.h`) is stored in
+NVS and carries a `struct_version` (`LAMBDA_STATS_VERSION`) plus a CRC-32,
+checked by `lambda_stats_validate()`. `nvs_store_load_stats()` no longer
+falls straight back to a zeroed reset when that check fails on a version
+bump — it first calls `lambda_stats_migrate_legacy()`, which recognizes
+older on-disk layouts (by blob size, embedded version, and that version's
+own CRC) and carries forward whatever fields the old layout had.
+
+**Rule: whenever `LAMBDA_STATS_VERSION` is bumped, add the struct's
+*previous* shape as a new `legacy_stats_vN_t` + migration case in
+`lambda_stats.c`** (see the existing v1/v2/v3 cases) instead of accepting
+that flashing the new firmware wipes the device's long-term stats. A field
+that's genuinely new (no equivalent in the old layout) is left at its
+`lambda_stats_reset()` default — only truly-unrecoverable data should be
+lost, not everything.
+
+`nvs_store_load_config()` (calibration) has no such version gate — it only
+checks blob size, so it isn't affected by this and doesn't need migration
+cases when `si_calibration_t` changes shape, since a size mismatch there
+already falls back to `si_default_calibration()` safely (recalibration is
+cheap; long-term stats are not).

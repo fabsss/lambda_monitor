@@ -35,24 +35,51 @@ void test_fast_filter_caps_at_window_size(void)
     TEST_ASSERT_EQUAL_UINT8(FAST_FILTER_SIZE, f.count);
 }
 
-void test_slow_filter_no_average_before_window_elapses(void)
+void test_slow_filter_averages_immediately_not_only_after_window(void)
 {
+    /* A moving average must update on every push, not just once the
+     * window has fully filled (that would be a tumbling/block average). */
     slow_filter_t f;
     slow_filter_init(&f, 5);
-    slow_filter_push(&f, 100, 2);
-    TEST_ASSERT_EQUAL_INT32(0, slow_filter_average(&f));
+    slow_filter_push(&f, 100, 1);
+    TEST_ASSERT_EQUAL_INT32(100, slow_filter_average(&f));
+    slow_filter_push(&f, 200, 1);
+    TEST_ASSERT_EQUAL_INT32(150, slow_filter_average(&f));
 }
 
-void test_slow_filter_publishes_average_after_window(void)
+void test_slow_filter_caps_at_window_size(void)
 {
     slow_filter_t f;
     slow_filter_init(&f, 5);
-    slow_filter_push(&f, 100, 2);
-    slow_filter_push(&f, 200, 3);
-    /* elapsed_s = 5, window elapsed: avg = (100+200)/2 = 150 */
-    TEST_ASSERT_EQUAL_INT32(150, slow_filter_average(&f));
-    TEST_ASSERT_EQUAL_UINT32(0, f.elapsed_s);
-    TEST_ASSERT_EQUAL_UINT32(0, f.count);
+    for (int i = 0; i < 4; i++) {
+        slow_filter_push(&f, 10, 1);
+    }
+    /* window now full of 10s; pushing a 60 should drop the oldest 10,
+     * not reset the whole window like a tumbling average would. */
+    slow_filter_push(&f, 60, 1);
+    /* four 10s + one 60 = 100 / 5 = 20 */
+    TEST_ASSERT_EQUAL_INT32(20, slow_filter_average(&f));
+
+    /* Next push slides the window further instead of jumping/resetting. */
+    slow_filter_push(&f, 60, 1);
+    /* three 10s + two 60s = 150 / 5 = 30 */
+    TEST_ASSERT_EQUAL_INT32(30, slow_filter_average(&f));
+}
+
+void test_slow_filter_does_not_reset_between_windows(void)
+{
+    /* Regression guard for the old tumbling-average bug: the average must
+     * not jump back to a fresh block average once window_s samples have
+     * been pushed - it keeps sliding smoothly. */
+    slow_filter_t f;
+    slow_filter_init(&f, 5);
+    for (int i = 0; i < 5; i++) {
+        slow_filter_push(&f, 100, 1);
+    }
+    TEST_ASSERT_EQUAL_INT32(100, slow_filter_average(&f));
+    slow_filter_push(&f, 100, 1);
+    /* Still all 100s in the window - no reset-induced jump. */
+    TEST_ASSERT_EQUAL_INT32(100, slow_filter_average(&f));
 }
 
 int main(void)
@@ -61,7 +88,8 @@ int main(void)
     RUN_TEST(test_fast_filter_single_sample_average_is_itself);
     RUN_TEST(test_fast_filter_averages_two_samples);
     RUN_TEST(test_fast_filter_caps_at_window_size);
-    RUN_TEST(test_slow_filter_no_average_before_window_elapses);
-    RUN_TEST(test_slow_filter_publishes_average_after_window);
+    RUN_TEST(test_slow_filter_averages_immediately_not_only_after_window);
+    RUN_TEST(test_slow_filter_caps_at_window_size);
+    RUN_TEST(test_slow_filter_does_not_reset_between_windows);
     return UNITY_END();
 }

@@ -59,9 +59,30 @@ static void save_blob(const char *key, const void *data, size_t size)
 
 void nvs_store_load_stats(lambda_longterm_stats_t *out)
 {
-    if (!load_blob(KEY_STATS, out, sizeof(*out)) || !lambda_stats_validate(out)) {
-        lambda_stats_reset(out);
+    if (load_blob(KEY_STATS, out, sizeof(*out)) && lambda_stats_validate(out)) {
+        return;
     }
+
+    /* Current-layout load failed - the blob may have been written by an
+     * older firmware whose lambda_longterm_stats_t was a different size
+     * (LAMBDA_STATS_VERSION bumped since). Re-read whatever is actually
+     * stored and try to recover it via lambda_stats_migrate_legacy()
+     * before giving up and resetting to zero. */
+    uint8_t raw[sizeof(*out)];
+    size_t raw_len = sizeof(raw);
+    nvs_handle_t handle;
+    bool have_raw = false;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) == ESP_OK) {
+        have_raw = nvs_get_blob(handle, KEY_STATS, raw, &raw_len) == ESP_OK;
+        nvs_close(handle);
+    }
+
+    if (have_raw && lambda_stats_migrate_legacy(out, raw, raw_len)) {
+        ESP_LOGI(TAG, "Migrated long-term stats from an older firmware's on-disk format");
+        return;
+    }
+
+    lambda_stats_reset(out);
 }
 
 void nvs_store_save_stats(const lambda_longterm_stats_t *stats)

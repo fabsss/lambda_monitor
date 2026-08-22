@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "signal_interpreter.h"
 
 #define LAMBDA_STATS_VERSION 4
@@ -91,5 +92,34 @@ void lambda_stats_finalize_crc(lambda_longterm_stats_t *stats);
  *              the stored crc32 matches the recomputed checksum.
  */
 bool lambda_stats_validate(const lambda_longterm_stats_t *stats);
+
+/**
+ * @brief Recover long-term stats from an older on-disk struct layout.
+ *
+ * lambda_longterm_stats_t has changed shape several times as
+ * LAMBDA_STATS_VERSION was bumped (1->2->3->4); a blob written by an
+ * older firmware no longer round-trips through lambda_stats_validate().
+ * This checks raw/raw_len against each known older layout (by size,
+ * embedded struct_version, and that version's own CRC-32) and, on a
+ * match, fills *out (current layout) with whatever fields the old
+ * layout actually had - so a firmware update doesn't discard long-term
+ * counters just because the struct grew a field.
+ *
+ * On a match, *out is first reset via lambda_stats_reset() (so any
+ * field the old layout lacks, e.g. a metric added since, is 0/its
+ * default) and then populated from the recovered fields. On no match,
+ * *out is left untouched.
+ *
+ * Whenever LAMBDA_STATS_VERSION is bumped, add the *previous* layout
+ * here as a new legacy_stats_vN_t case (see lambda_stats.c) instead of
+ * accepting data loss.
+ *
+ * @param out     Destination struct (current layout).
+ * @param raw     Raw bytes as read from storage.
+ * @param raw_len Number of bytes in raw.
+ * @return        true if raw matched a known older layout and *out was
+ *                populated; false otherwise.
+ */
+bool lambda_stats_migrate_legacy(lambda_longterm_stats_t *out, const void *raw, size_t raw_len);
 
 #endif /* LAMBDA_STATS_H */
