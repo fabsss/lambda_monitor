@@ -5,6 +5,7 @@
 #include "wifi_ap.h"
 #include "web_server.h"
 #include "ota_task.h"
+#include "dns_hijack.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -22,6 +23,7 @@ void app_main(void)
     nvs_store_init();
     adc_task_start(ADC_CHANNEL_LAMBDA);
     wifi_ap_start(WIFI_AP_SSID, WIFI_AP_PASSWORD);
+    dns_hijack_start();
     web_server_start();
     xTaskCreate(rollback_health_check_task, "health_check", 2048, NULL, 2, NULL);
 }
