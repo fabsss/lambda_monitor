@@ -115,3 +115,29 @@ with no internet, which correctly leaves mobile data active). Do not
 reintroduce a per-path `204`/`200` "success" response for any connectivity-
 check URL — the redirect is what tells the OS "no internet here, don't
 route through this network," which is what keeps mobile data usable.
+
+**The `302` redirect only matters if the client's DNS query for the
+connectivity-check hostname actually reaches this device.** This AP has no
+DNS relay of its own, so without `src/dns_hijack.c` a client's DNS query for
+e.g. `connectivitycheck.gstatic.com` just times out — the check's HTTP
+request never gets sent at all, and `captive_portal_handler` never gets a
+chance to respond. `dns_hijack_start()` (called from `main.c` right after
+`wifi_ap_start()`) runs a minimal UDP:53 server that answers every A-record
+query with the AP's own IP (`192.168.4.1`), the same "DNS hijack" trick
+WLED and ESP-IDF's own `captive_portal` example use — this is what actually
+gets the OS's connectivity probe to this device's `httpd` in the first
+place. Confirmed via a live comparison: a lambda_monitor AP without this
+still shows "connected, no internet" on the phone (same as a real hotspot),
+but *unlike* a real hotspot, mobile data still dropped — while WLED's AP
+(which does DNS-hijack) left mobile data active. Losing this DNS server
+silently reintroduces the mobile-data-drops-out symptom even though the
+HTTP-level fix (above) is still in place, since the OS's probe request
+never arrives to see it.
+
+Also note `web_server_start()` must set `config.uri_match_fn =
+httpd_uri_match_wildcard` on the `httpd_config_t` — `esp_http_server`'s
+default matcher is a plain exact-string comparison, so without this the
+`"/*"` entry for `captive_portal_handler` only ever matches a literal
+request for `"/*"` and every unmatched path (including the connectivity-
+check URLs once DNS-hijack gets them here) silently 404s instead of
+getting the intended `302`.
