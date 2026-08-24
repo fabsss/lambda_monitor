@@ -442,15 +442,15 @@ void web_server_start(void)
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 20;
     /* Without this, esp_http_server's default matcher does a plain exact
-     * string comparison - the "/*" entry below would only ever match a
-     * literal request for "/*", never actually catch unmatched paths like
-     * /generate_204 or /hotspot-detect.html. That silently turned
-     * captive_portal_handler into dead code: every connectivity-check URL
-     * fell through to esp_http_server's default 404 instead of the
-     * intended 302 redirect. Not a 204 "success" either, but 404 doesn't
-     * trigger the OS's "sign in to network" captive-portal flow the
-     * redirect is meant to provide - see the comment on
-     * captive_portal_handler. */
+     * string comparison - the wildcard entry below (uri = slash-star)
+     * would only ever match a literal request for that exact two-char
+     * path, never actually catch unmatched paths like /generate_204 or
+     * /hotspot-detect.html. That silently turned captive_portal_handler
+     * into dead code: every connectivity-check URL fell through to
+     * esp_http_server's default 404 instead of the intended 302 redirect.
+     * Not a 204 "success" either, but 404 doesn't trigger the OS's "sign
+     * in to network" captive-portal flow the redirect is meant to provide
+     * - see the comment on captive_portal_handler. */
     config.uri_match_fn = httpd_uri_match_wildcard;
     esp_err_t err = httpd_start(&s_server, &config);
     if (err != ESP_OK) {
