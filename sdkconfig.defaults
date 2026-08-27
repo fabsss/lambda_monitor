@@ -6,3 +6,9 @@ CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 # reaches a handler - including the OS's own captive-portal connectivity
 # check, which then never sees the intended redirect. See CLAUDE.md.
 CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
+# web_server_start() raises httpd's max_open_sockets to 12 (default 7 was
+# exhausted by normal browser traffic - see the comment there). LWIP's
+# system-wide socket limit must cover that plus httpd's listener + control
+# socketpair plus dns_hijack.c's own UDP socket, or httpd's own socket()
+# calls start failing before max_open_sockets is ever reached. See CLAUDE.md.
+CONFIG_LWIP_MAX_SOCKETS=16

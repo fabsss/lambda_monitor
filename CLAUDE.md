@@ -160,3 +160,31 @@ and directly in the committed `sdkconfig.esp32s3` (which, once it exists,
 is what PlatformIO/ESP-IDF actually build from — `sdkconfig.defaults` only
 seeds *new* keys or a from-scratch config, it does not override a value
 already present in the frozen per-environment file).
+
+**`esp_http_server`'s default socket pool (7, no LRU purge) is too small
+for real browser traffic and does not self-heal once exhausted.**
+`HTTPD_DEFAULT_CONFIG()` sets `max_open_sockets = 7` and
+`lru_purge_enable = false`: once 7 connections are open, every new
+connection is rejected outright rather than evicting an idle one. A real
+browser opens more than one connection per page load (redirect
+follow-up, retries, etc.), so a handful of reloads is enough to exhaust
+it — and once exhausted, the *entire* web UI stops responding (not just
+the request that tipped it over), staying down until the device reboots,
+even though Wi-Fi itself remains fully connected the whole time (confirmed
+live: this looks exactly like "the device crashed," but it hadn't -
+`GET /` itself started failing while the AP stayed joined). This is
+what actually broke the web UI immediately after the wildcard-redirect
+fix above started making `captive_portal_handler` reachable for the
+first time - it had never been exercised by a real browser before.
+`web_server_start()` sets `config.max_open_sockets = 12` and
+`config.lru_purge_enable = true` to add headroom and make the pool
+self-healing. Raising `max_open_sockets` alone is not enough: it must
+stay under lwIP's *system-wide* socket ceiling
+(`CONFIG_LWIP_MAX_SOCKETS`), which also has to cover httpd's listener
+socket, its internal control socketpair, and `dns_hijack.c`'s own UDP
+socket - bumped to 16 in both sdkconfig files (same two-file reasoning as
+`CONFIG_HTTPD_MAX_REQ_HDR_LEN` above) to leave headroom above
+`max_open_sockets`. Also make sure any handler that can fail to send
+(like `captive_portal_handler`) returns `httpd_resp_send()`'s result
+instead of unconditionally `return ESP_OK` - otherwise a failed send
+leaves that socket lingering instead of being closed immediately.

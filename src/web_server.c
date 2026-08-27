@@ -350,8 +350,12 @@ static esp_err_t captive_portal_handler(httpd_req_t *req)
 {
     httpd_resp_set_status(req, "302 Found");
     httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
-    httpd_resp_send(req, NULL, 0);
-    return ESP_OK;
+    /* Propagate the send result (unlike a bare "send then return ESP_OK")
+     * so that a failed send - e.g. the client already dropped the
+     * connection - makes httpd close this socket immediately instead of
+     * leaving it lingering; see the max_open_sockets/lru_purge_enable
+     * comment in web_server_start(). */
+    return httpd_resp_send(req, NULL, 0);
 }
 
 /* Reports the SoftAP credentials currently in effect (custom if saved,
@@ -441,6 +445,21 @@ void web_server_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 20;
+    /* HTTPD_DEFAULT_CONFIG() caps concurrent connections at 7 and, with
+     * lru_purge_enable left false, never reclaims a slot once all 7 are
+     * in use - a new connection is simply rejected instead of evicting an
+     * idle one. A real browser opens far more than one connection per
+     * page load (retries, a follow-up request for the redirect target,
+     * etc.), so this pool exhausts fast during normal use - and once it
+     * does, the *entire* web UI stops responding (not just the request
+     * that tipped it over) until the device is rebooted. Confirmed live:
+     * after a few browser reloads hitting the (now finally reachable)
+     * captive-portal redirect, even GET / started failing while Wi-Fi
+     * itself stayed fully connected - the httpd session pool was full,
+     * not the device down. Both changes below are defense in depth:
+     * more headroom, and self-healing once it's still not enough. */
+    config.max_open_sockets = 12;
+    config.lru_purge_enable = true;
     /* Without this, esp_http_server's default matcher does a plain exact
      * string comparison - the wildcard entry below (uri = slash-star)
      * would only ever match a literal request for that exact two-char
