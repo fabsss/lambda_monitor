@@ -1,2 +1,8 @@
 CONFIG_HTTPD_WS_SUPPORT=y
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+# Default (512) is too small for a real browser's request headers (User-Agent,
+# Sec-CH-UA-*, Accept-Language, etc. easily exceed it), causing esp_http_server
+# to reject the request with "Header fields are too long" before it ever
+# reaches a handler - including the OS's own captive-portal connectivity
+# check, which then never sees the intended redirect. See CLAUDE.md.
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048
