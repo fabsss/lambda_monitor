@@ -141,3 +141,22 @@ default matcher is a plain exact-string comparison, so without this the
 request for `"/*"` and every unmatched path (including the connectivity-
 check URLs once DNS-hijack gets them here) silently 404s instead of
 getting the intended `302`.
+
+**`CONFIG_HTTPD_MAX_REQ_HDR_LEN` must be raised well past ESP-IDF's 512-byte
+default, or the connectivity check never reaches a handler at all.** A real
+browser/OS HTTP client (Chrome, Android's own connectivity-check prober)
+sends a full header set — `User-Agent`, `Sec-CH-UA-*`, `Accept-Language`,
+etc. — that easily exceeds 512 bytes, well past what this project's own
+lightweight `fetch()` calls in `app.js` ever send. Once exceeded,
+`esp_http_server` rejects the request outright with a "header fields are
+too long" error *before* it ever reaches `captive_portal_handler` — so the
+DNS-hijack and wildcard-redirect fixes above can both be working perfectly
+and the OS's connectivity probe still never sees the intended `302`
+(confirmed by hitting `http://connectivitycheck.gstatic.com/generate_204`
+directly in a phone browser while joined to the AP and getting exactly that
+error page back). Set via `CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048` in both
+`sdkconfig.defaults` (so a from-scratch `sdkconfig` regeneration keeps it)
+and directly in the committed `sdkconfig.esp32s3` (which, once it exists,
+is what PlatformIO/ESP-IDF actually build from — `sdkconfig.defaults` only
+seeds *new* keys or a from-scratch config, it does not override a value
+already present in the frozen per-environment file).
